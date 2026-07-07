@@ -1,0 +1,10 @@
+node_modules/
+dist/
+downloads/
+.agents/
+.vscode/
+*.log
+diziyou_*.html
+diziyou_*.js
+*.mp4
+*.ts

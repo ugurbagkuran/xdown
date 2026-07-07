@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="tr">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>filmdownloader. // decryption_utility</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Anybody:wght@700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600&display=swap"
+            rel="stylesheet"
+        />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        />
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <div class="app-container">
+            <header class="app-header">
+                <div class="logo">
+                    <i class="fa-solid fa-terminal logo-icon"></i>
+                    <h1>filmdownloader.</h1>
+                </div>
+                <p class="subtitle">
+                    png_ts_decryption_utility.exe
+                </p>
+            </header>
+
+            <main class="app-content">
+                <!-- Sekme Çubuğu -->
+                <div class="tabs-bar" style="grid-column: 1/-1">
+                    <button class="tab-btn active" data-tab="tab-search">
+                        <i class="fa-solid fa-search"></i> film_ara.
+                    </button>
+                    <button class="tab-btn" data-tab="tab-manual">
+                        <i class="fa-solid fa-sliders"></i> manuel_islem.
+                    </button>
+                </div>
+
+                <!-- ══════════ SEKME 1: FİLM ARA ══════════ -->
+                <div
+                    id="tab-search"
+                    class="tab-panel active"
+                    style="grid-column: 1/-1"
+                >
+                    <div class="card glass" style="margin-bottom: 20px">
+                        <div class="card-header">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <h2>otomatik_arama_servisi.</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="search-bar">
+                                <input
+                                    type="text"
+                                    id="search-input"
+                                    placeholder="aranacak film adını girin..."
+                                />
+                                <button id="btn-search">
+                                    <i class="fa-solid fa-search"></i> ara.
+                                </button>
+                            </div>
+
+                            <div id="film-grid" class="film-grid">
+                                <div class="search-empty">
+                                    <i
+                                        class="fa-solid fa-terminal"
+                                        style="
+                                            font-size: 32px;
+                                            margin-bottom: 12px;
+                                            display: block;
+                                            opacity: 0.3;
+                                        "
+                                    ></i>
+                                    arama_sorgusu_bekleniyor...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Otomatik indirme kuyruğu: her film kendi kartında, aynı anda birden fazla film indirilebilir -->
+                    <div id="download-queue"></div>
+                </div>
+
+                <!-- ══════════ SEKME 2: MANUEL İNDİRME ══════════ -->
+                <div id="tab-manual" class="tab-panel">
+                    <section class="panel-left">
+                        <!-- Kart 1: Kaynak URL Girişi -->
+                        <div class="card glass">
+                            <div class="card-header">
+                                <i class="fa-solid fa-link"></i>
+                                <h2>akis_kaynagi_verisi.</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="input-group">
+                                    <label for="stream-url"
+                                        >M3U8 veya PNG Segment URL'si</label
+                                    >
+                                    <div class="input-with-btn">
+                                        <input
+                                            type="text"
+                                            id="stream-url"
+                                            placeholder="https://example.com/playlist.m3u8 veya segment.png"
+                                            required
+                                        />
+                                        <button
+                                            id="btn-analyze"
+                                            class="btn btn-secondary"
+                                        >
+                                            <i
+                                                class="fa-solid fa-magnifying-glass"
+                                            ></i>
+                                            analiz_et.
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Kart 2: Deşifre Ayarları -->
+                        <div class="card glass">
+                            <div class="card-header">
+                                <i class="fa-solid fa-sliders"></i>
+                                <h2>desifre_ayarlari.</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="input-group">
+                                    <label for="decrypt-method"
+                                        >Deşifre Metodu</label
+                                    >
+                                    <select id="decrypt-method">
+                                        <option value="none">
+                                            Deşifre Etme (Doğrudan Birleştir)
+                                        </option>
+                                        <option value="auto">
+                                            Otomatik Algıla (Önerilen)
+                                        </option>
+                                        <option value="xor">
+                                            XOR Maskesi Çözümü
+                                        </option>
+                                        <option value="strip">
+                                            Header Stripping (Byte Kesme)
+                                        </option>
+                                        <option value="aes-128">
+                                            AES-128-CBC Decryption
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div id="method-options">
+                                    <div class="input-group val-key hidden">
+                                        <label for="decrypt-key"
+                                            >Anahtar (Key)
+                                            <span class="help-text"
+                                                >(Hex: 0x55 veya 55aa, Sayı: 85,
+                                                Metin: abc)</span
+                                            ></label
+                                        >
+                                        <input
+                                            type="text"
+                                            id="decrypt-key"
+                                            placeholder="Örn: 0x55"
+                                        />
+                                    </div>
+                                    <div class="input-group val-iv hidden">
+                                        <label for="decrypt-iv"
+                                            >AES IV (Hex 16 byte -
+                                            opsiyonel)</label
+                                        >
+                                        <input
+                                            type="text"
+                                            id="decrypt-iv"
+                                            placeholder="Örn: 00000000000000000000000000000000"
+                                        />
+                                    </div>
+                                    <div class="input-group val-strip hidden">
+                                        <label for="strip-bytes"
+                                            >Kesilecek Byte Sayısı (Header
+                                            Size)</label
+                                        >
+                                        <input
+                                            type="number"
+                                            id="strip-bytes"
+                                            min="0"
+                                            placeholder="Örn: 8"
+                                            value="0"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="input-row">
+                                    <div class="input-group">
+                                        <label for="concurrency"
+                                            >Eşzamanlı Bağlantı</label
+                                        >
+                                        <div class="range-container">
+                                            <input
+                                                type="range"
+                                                id="concurrency"
+                                                min="1"
+                                                max="32"
+                                                value="16"
+                                            />
+                                            <span id="concurrency-val">16</span>
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="output-format"
+                                            >Çıktı Formatı</label
+                                        >
+                                        <select id="output-format">
+                                            <option value="ts">
+                                                TS (MPEG-TS) — Hızlı
+                                            </option>
+                                            <option value="mp4">
+                                                MP4 — FFmpeg gerekir
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="output-name"
+                                            >Çıktı Dosya Adı</label
+                                        >
+                                        <input
+                                            type="text"
+                                            id="output-name"
+                                            value="downloaded_video.ts"
+                                            placeholder="video.ts"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div class="input-group">
+                                    <label for="custom-referer"
+                                        >Custom Referer (İsteğe Bağlı)</label
+                                    >
+                                    <input
+                                        type="text"
+                                        id="custom-referer"
+                                        placeholder="Örn: https://fastplay.mom/"
+                                    />
+                                </div>
+
+                                <button
+                                    id="btn-start"
+                                    class="btn btn-primary btn-block"
+                                    disabled
+                                >
+                                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                                    islemi_baslat.
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="panel-right">
+                        <!-- Kart 3: Otomatik Analiz Sonuçları -->
+                        <div id="analysis-panel" class="card glass hidden">
+                            <div class="card-header">
+                                <i class="fa-solid fa-chart-simple"></i>
+                                <h2>akis_analiz_raporu.</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="analysis-summary">
+                                    <div class="analysis-info">
+                                        <span class="info-label"
+                                            >Parça Boyutu:</span
+                                        >
+                                        <span id="info-size" class="info-val"
+                                            >-</span
+                                        >
+                                    </div>
+                                    <div class="analysis-info">
+                                        <span class="info-label"
+                                            >İlk 16 Byte (Hex):</span
+                                        >
+                                        <span
+                                            id="info-hex"
+                                            class="info-val font-code"
+                                            >-</span
+                                        >
+                                    </div>
+                                    <div
+                                        id="suggestion-alert"
+                                        class="alert alert-info"
+                                    >
+                                        <strong>Öneri:</strong>
+                                        <span id="suggestion-text"
+                                            >Analiz bekleniyor...</span
+                                        >
+                                        <button
+                                            id="btn-apply-suggestion"
+                                            class="btn btn-small btn-secondary hidden"
+                                        >
+                                            Uygula
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="hex-viewer-title">
+                                    Örnek Segment İlk Byte Görünümü (Şifreli):
+                                </div>
+                                <div class="hex-grid-container">
+                                    <div
+                                        id="hex-viewer-grid"
+                                        class="hex-grid font-code"
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Kart 4: Canlı İlerleme -->
+                        <div id="progress-panel" class="card glass hidden">
+                            <div class="card-header">
+                                <i class="fa-solid fa-rotate"></i>
+                                <h2>ilerleme_durumu.</h2>
+                                <button
+                                    id="btn-cancel"
+                                    class="btn btn-danger btn-small"
+                                >
+                                    <i class="fa-solid fa-xmark"></i> iptal_et.
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div class="progress-details">
+                                    <div class="progress-info-row">
+                                        <span>Tamamlanan Segmentler:</span>
+                                        <strong id="progress-count"
+                                            >0 / 0</strong
+                                        >
+                                    </div>
+                                    <div class="progress-info-row">
+                                        <span>Durum:</span>
+                                        <span
+                                            id="progress-status"
+                                            class="status-badge status-running"
+                                            >İndiriliyor...</span
+                                        >
+                                    </div>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div
+                                        id="progress-bar-fill"
+                                        class="progress-bar-fill"
+                                        style="width: 0%"
+                                    ></div>
+                                </div>
+                                <div class="log-title">
+                                    İşlem Günlükleri (Live Logs):
+                                </div>
+                                <div
+                                    id="log-terminal"
+                                    class="log-terminal font-code"
+                                ></div>
+                                <div
+                                    id="download-link-container"
+                                    class="download-link-container hidden"
+                                >
+                                    <div class="alert alert-success">
+                                        <i class="fa-solid fa-circle-check"></i>
+                                        Video başarıyla oluşturuldu!
+                                    </div>
+                                    <a
+                                        id="btn-download-file"
+                                        href="#"
+                                        download
+                                        class="btn btn-success btn-block"
+                                    >
+                                        <i
+                                            class="fa-solid fa-file-arrow-down"
+                                        ></i>
+                                        Videoyu Bilgisayara İndir
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </div>
+
+        <footer class="app-footer">
+            <p>filmdownloader_v1.0.0 // system_active.</p>
+        </footer>
+
+        <script src="app.js" type="module"></script>
+    </body>
+</html>

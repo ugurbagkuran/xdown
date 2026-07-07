@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FILM_DL // CORE - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wght@700;800&amp;family=JetBrains+Mono:wght@400;700&amp;family=Space+Grotesk:wght@600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#ffffff",
+                        "surface-container": "#16191f",
+                        "error-container": "#93000a",
+                        "secondary-fixed": "#e2e8f0",
+                        "on-primary-fixed-variant": "#334155",
+                        "tertiary-fixed": "#cbd5e1",
+                        "surface-variant": "#1e2229",
+                        "on-secondary": "#0f1115",
+                        "tertiary-container": "#334155",
+                        "outline": "#334155",
+                        "on-secondary-fixed": "#0f1115",
+                        "secondary": "#94a3b8",
+                        "tertiary": "#cbd5e1",
+                        "surface-bright": "#20242c",
+                        "primary-fixed-dim": "#e0e0e0",
+                        "on-tertiary-fixed-variant": "#334155",
+                        "on-tertiary-fixed": "#0f1115",
+                        "surface-dim": "#0f1115",
+                        "on-surface": "#f8fafc",
+                        "background": "#0f1115",
+                        "secondary-fixed-dim": "#cbd5e1",
+                        "on-tertiary-container": "#e2e8f0",
+                        "secondary-container": "#334155",
+                        "inverse-primary": "#94a3b8",
+                        "on-primary-fixed": "#000000",
+                        "primary-fixed": "#ffffff",
+                        "on-primary-container": "#000000",
+                        "surface-tint": "#ffffff",
+                        "surface-container-low": "#111317",
+                        "on-primary": "#000000",
+                        "on-secondary-fixed-variant": "#334155",
+                        "outline-variant": "#1e293b",
+                        "inverse-on-surface": "#0f1115",
+                        "primary-container": "#e0e0e0",
+                        "on-background": "#e2e8f0",
+                        "surface-container-highest": "#20242c",
+                        "surface-container-high": "#1b1f26",
+                        "on-tertiary": "#0f1115",
+                        "surface": "#14171c",
+                        "on-error-container": "#ffdad6",
+                        "on-error": "#690005",
+                        "tertiary-fixed-dim": "#94a3b8",
+                        "on-surface-variant": "#94a3b8",
+                        "error": "#ffb4ab",
+                        "surface-container-lowest": "#0b0c0f",
+                        "inverse-surface": "#f8fafc",
+                        "on-secondary-container": "#f8fafc"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-max-width": "1440px",
+                        "margin-mobile": "20px",
+                        "unit": "4px",
+                        "margin-desktop": "64px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["JetBrains Mono"],
+                        "label-caps": ["Space Grotesk"],
+                        "headline-lg": ["Anybody"],
+                        "headline-lg-mobile": ["Anybody"],
+                        "display-xl": ["Anybody"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "headline-lg": ["48px", { "lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["32px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "display-xl": ["120px", { "lineHeight": "110px", "letterSpacing": "-0.04em", "fontWeight": "800" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: -10px;
+            width: 2px;
+            height: 100%;
+            background: theme('colors.primary');
+            box-shadow: 0 0 10px theme('colors.primary');
+            opacity: 0;
+        }
+        .input-focused .scan-line {
+            animation: scan 1.5s ease-in-out infinite;
+            opacity: 1;
+        }
+        @keyframes scan {
+            0% { left: 0; }
+            50% { left: 100%; }
+            100% { left: 0; }
+        }
+        .log-stream::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log-stream::-webkit-scrollbar-track {
+            background: theme('colors.surface-container-lowest');
+        }
+        .log-stream::-webkit-scrollbar-thumb {
+            background: theme('colors.surface-variant');
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen overflow-x-hidden selection:bg-primary selection:text-on-primary">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 border-r border-outline-variant bg-surface-container-lowest z-50">
+<div class="py-8 px-6 border-b border-outline-variant mb-6">
+<h1 class="font-display-xl text-display-xl tracking-tighter text-on-surface uppercase mb-2 leading-none" style="font-size: 3rem;">FILM_DL</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant">V2.0.48_STABLE</p>
+</div>
+<div class="flex-1 px-4 space-y-2">
+<!-- Dashboard (Active) -->
+<a class="flex items-center text-primary font-bold border-l-4 border-primary pl-4 py-3 bg-surface-variant transition-all scale-[0.99] group" href="#">
+<span class="material-symbols-outlined mr-4" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Dashboard</span>
+</a>
+<!-- Search -->
+<a class="flex items-center text-on-surface-variant pl-4 py-3 border-l-4 border-transparent hover:bg-surface-container-high transition-colors duration-150 opacity-60 hover:opacity-100 group" href="#">
+<span class="material-symbols-outlined mr-4">search</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Search</span>
+</a>
+<!-- Downloads -->
+<a class="flex items-center text-on-surface-variant pl-4 py-3 border-l-4 border-transparent hover:bg-surface-container-high transition-colors duration-150 opacity-60 hover:opacity-100 group" href="#">
+<span class="material-symbols-outlined mr-4">download</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Downloads</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center text-on-surface-variant pl-4 py-3 border-l-4 border-transparent hover:bg-surface-container-high transition-colors duration-150 opacity-60 hover:opacity-100 group" href="#">
+<span class="material-symbols-outlined mr-4">settings</span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest">Settings</span>
+</a>
+</div>
+<div class="p-6 mt-auto">
+<button class="w-full bg-primary text-on-primary font-label-caps text-label-caps uppercase py-4 font-bold tracking-widest hover:bg-primary-container transition-colors">
+                NEW TASK
+            </button>
+</div>
+</nav>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 w-full md:w-[calc(100%-16rem)] h-16 border-b border-outline-variant bg-surface-dim z-40 flex justify-between items-center px-gutter">
+<div class="flex items-center space-x-4">
+<button class="md:hidden text-primary">
+<span class="material-symbols-outlined text-2xl">menu</span>
+</button>
+<div class="font-label-caps text-label-caps font-bold tracking-widest text-primary">FILM_DL // CORE</div>
+</div>
+<div class="flex items-center space-x-6 text-on-surface-variant">
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors" data-icon="terminal">terminal</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors" data-icon="account_circle">account_circle</span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-24 pb-12 px-margin-mobile md:px-margin-desktop md:ml-64 min-h-screen grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+<!-- Brutalist Typography Header -->
+<div class="col-span-1 md:col-span-12 mb-8 relative">
+<h2 class="font-display-xl text-display-xl text-on-surface opacity-10 absolute -top-16 -left-4 pointer-events-none select-none">DOWN.</h2>
+</div>
+<!-- SEARCH / INPUT AREA (Left Column on Desktop) -->
+<section class="col-span-1 md:col-span-5 flex flex-col gap-6 relative z-10">
+<div class="bg-surface-container border border-outline-variant p-6 relative overflow-hidden group">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-label-caps text-label-caps text-primary tracking-widest uppercase">Target Locator</h3>
+<span class="text-xs text-on-surface-variant opacity-50">SYS.INP.01</span>
+</div>
+<div class="relative input-wrapper">
+<input class="w-full bg-surface-container-lowest border border-outline-variant text-on-surface font-body-md p-4 focus:outline-none focus:border-primary focus:ring-0 transition-colors placeholder:text-on-surface-variant placeholder:opacity-30" id="url-input" placeholder="ENTER M3U8 OR DASH MANIFEST URL..." type="text"/>
+<div class="scan-line hidden"></div>
+</div>
+<div class="mt-4 flex gap-2">
+<button class="flex-1 bg-primary text-on-primary font-label-caps text-label-caps py-3 uppercase font-bold tracking-widest hover:bg-primary-container transition-colors relative overflow-hidden group">
+<span class="relative z-10">YAKALA // CAPTURE</span>
+</button>
+<button class="px-4 border-2 border-outline-variant text-on-surface hover:border-primary hover:text-primary transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined">qr_code_scanner</span>
+</button>
+</div>
+<!-- Quick Tags -->
+<div class="mt-6 flex flex-wrap gap-2">
+<span class="border border-outline-variant px-2 py-1 text-[10px] text-on-surface-variant font-body-md">HLS/M3U8</span>
+<span class="border border-outline-variant px-2 py-1 text-[10px] text-on-surface-variant font-body-md">MPEG-DASH</span>
+<span class="border border-outline-variant px-2 py-1 text-[10px] text-on-surface-variant font-body-md">1080p MAX</span>
+</div>
+</div>
+<!-- Stats/Info Box -->
+<div class="bg-surface-container border border-outline-variant p-6 grid grid-cols-2 gap-4">
+<div>
+<div class="text-[10px] text-on-surface-variant font-label-caps uppercase tracking-widest mb-1">Network</div>
+<div class="font-body-md text-primary">1.2 Gbps</div>
+</div>
+<div>
+<div class="text-[10px] text-on-surface-variant font-label-caps uppercase tracking-widest mb-1">Disk Space</div>
+<div class="font-body-md text-on-surface">412 GB FREE</div>
+</div>
+</div>
+</section>
+<!-- ACTIVE PROCESSES & LOGS (Right Column on Desktop) -->
+<section class="col-span-1 md:col-span-7 flex flex-col gap-6 relative z-10">
+<!-- Active Processes -->
+<div class="bg-surface-container border border-outline-variant p-6">
+<div class="flex justify-between items-center border-b border-outline-variant pb-4 mb-4">
+<h3 class="font-label-caps text-label-caps text-on-surface tracking-widest uppercase">Aktif İşlemler</h3>
+<span class="bg-primary text-on-primary px-2 py-0.5 text-xs font-bold">2 RUNNING</span>
+</div>
+<div class="space-y-6">
+<!-- Process 1 -->
+<div class="relative">
+<div class="flex justify-between items-end mb-2">
+<div>
+<h4 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface m-0 leading-none">PROC_042</h4>
+<span class="text-xs text-primary font-body-md">AES Decryption // Segments: 450/1024</span>
+</div>
+<div class="text-right">
+<span class="block text-xl font-bold text-on-surface font-body-md">43%</span>
+<span class="text-[10px] text-on-surface-variant font-body-md">12.4 MB/s</span>
+</div>
+</div>
+<div class="w-full h-1 bg-surface-container-lowest">
+<div class="h-full bg-primary" style="width: 43%;"></div>
+</div>
+</div>
+<!-- Process 2 -->
+<div class="relative">
+<div class="flex justify-between items-end mb-2">
+<div>
+<h4 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface m-0 leading-none">PROC_041</h4>
+<span class="text-xs text-on-surface-variant font-body-md">FFMPEG Merging // output.mkv</span>
+</div>
+<div class="text-right">
+<span class="block text-xl font-bold text-on-surface font-body-md">89%</span>
+<span class="text-[10px] text-on-surface-variant font-body-md">Processing...</span>
+</div>
+</div>
+<div class="w-full h-1 bg-surface-container-lowest">
+<div class="h-full bg-primary" style="width: 89%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- System Logs -->
+<div class="bg-surface-container-lowest border border-outline-variant p-0 flex flex-col h-64">
+<div class="bg-surface-variant px-4 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">SYS.LOG</span>
+<div class="flex space-x-2">
+<div class="w-2 h-2 bg-on-surface-variant rounded-full"></div>
+<div class="w-2 h-2 bg-on-surface-variant rounded-full"></div>
+<div class="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+</div>
+</div>
+<div class="p-4 font-body-md text-xs text-on-surface-variant overflow-y-auto log-stream flex-1 space-y-1">
+<div class="text-primary">&gt; INIT: FILM_DL CORE v2.0.48</div>
+<div>&gt; Checking dependencies... FFMPEG OK.</div>
+<div>&gt; Loading decryption keys...</div>
+<div class="text-secondary">&gt; [PROC_041] Merging segments 1-500...</div>
+<div class="text-secondary">&gt; [PROC_041] Warning: Dropped frame at 00:12:45.00</div>
+<div>&gt; [PROC_042] Starting AES-128 decryption for manifest 'master.m3u8'</div>
+<div>&gt; [PROC_042] Downloading segment seg_00450.ts (1.2MB)</div>
+<div>&gt; [PROC_042] Decrypting seg_00450.ts... OK</div>
+<div>&gt; [PROC_042] Downloading segment seg_00451.ts (1.3MB)</div>
+<div class="text-primary animate-pulse">_</div>
+</div>
+</div>
+</section>
+</main>
+<script>
+        // Simple interaction for the input field to show scan line
+        const input = document.getElementById('url-input');
+        const wrapper = input.parentElement;
+        const scanLine = wrapper.querySelector('.scan-line');
+
+        input.addEventListener('focus', () => {
+            wrapper.classList.add('input-focused');
+            scanLine.classList.remove('hidden');
+        });
+
+        input.addEventListener('blur', () => {
+            wrapper.classList.remove('input-focused');
+            scanLine.classList.add('hidden');
+        });
+    </script>
+</body></html>
