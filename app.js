@@ -295,36 +295,54 @@ async function autoDownloadFilm(filmUrl, filmTitle) {
   });
 
   try {
-    // Adim 1: Film sayfasindan oynatici bilgisi cikar
-    setExtractStep(root, "film", "active");
-    const playerRes = await fetch(
-      `/api/extract-player?url=${encodeURIComponent(filmUrl)}`,
-    );
-    const playerData = await playerRes.json();
-    if (!playerData.success) throw new Error(playerData.error);
-    setExtractStep(root, "film", "done");
+    let streamData = null;
+    const isDirectM3u8 = filmUrl.includes(".m3u8");
 
-    // Adim 2: admin-ajax uzerinden manifest/iframe adresini al
-    setExtractStep(root, "ajax", "active");
-    const partKeyParam = playerData.partKey
-      ? `&partKey=${encodeURIComponent(playerData.partKey)}`
-      : "";
-    const streamRes = await fetch(
-      `/api/extract-stream?postId=${playerData.postId}&nonce=${playerData.nonce}&player=FastPlay&filmUrl=${encodeURIComponent(filmUrl)}${partKeyParam}`,
-    );
-    if (!streamRes.ok) {
-      const text = await streamRes.text();
-      throw new Error(`API Hatası (extract-stream): ${text.substring(0, 150)}`);
+    if (isDirectM3u8) {
+      // Diziyou or direct m3u8 stream - skip extraction steps
+      setExtractStep(root, "film", "done", "(doğrudan)");
+      setExtractStep(root, "ajax", "done", "(doğrudan)");
+      setExtractStep(root, "manifest", "done", "(doğrudan)");
+      
+      streamData = {
+        success: true,
+        manifestUrl: filmUrl,
+        streamReferer: "https://www.diziyou.one/",
+        candidateUrls: [filmUrl]
+      };
+    } else {
+      // Normal film page - extract player and stream info
+      setExtractStep(root, "film", "active");
+      const playerRes = await fetch(
+        `/api/extract-player?url=${encodeURIComponent(filmUrl)}`,
+      );
+      const playerData = await playerRes.json();
+      if (!playerData.success) throw new Error(playerData.error);
+      setExtractStep(root, "film", "done");
+
+      setExtractStep(root, "ajax", "active");
+      const partKeyParam = playerData.partKey
+        ? `&partKey=${encodeURIComponent(playerData.partKey)}`
+        : "";
+      const streamRes = await fetch(
+        `/api/extract-stream?postId=${playerData.postId}&nonce=${playerData.nonce}&player=FastPlay&filmUrl=${encodeURIComponent(filmUrl)}${partKeyParam}`,
+      );
+      if (!streamRes.ok) {
+        const text = await streamRes.text();
+        throw new Error(`API Hatası (extract-stream): ${text.substring(0, 150)}`);
+      }
+      const sData = await streamRes.json();
+      if (!sData.success) throw new Error(sData.error);
+      setExtractStep(root, "ajax", "done");
+      setExtractStep(
+        root,
+        "manifest",
+        "done",
+        sData.usedPlayer ? `(${sData.usedPlayer})` : "",
+      );
+      
+      streamData = sData;
     }
-    const streamData = await streamRes.json();
-    if (!streamData.success) throw new Error(streamData.error);
-    setExtractStep(root, "ajax", "done");
-    setExtractStep(
-      root,
-      "manifest",
-      "done",
-      streamData.usedPlayer ? `(${streamData.usedPlayer})` : "",
-    );
 
     // Adim 3: Manifesti analiz ederek segment listesini cikar
     setExtractStep(root, "analyze", "active");
