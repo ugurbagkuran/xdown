@@ -51,6 +51,14 @@
                             <h2>otomatik_arama_servisi.</h2>
                         </div>
                         <div class="card-body">
+                            <div class="search-type-selector">
+                                <button class="type-btn active" data-type="movie">
+                                    <i class="fa-solid fa-film"></i> film_ara.
+                                </button>
+                                <button class="type-btn" data-type="series">
+                                    <i class="fa-solid fa-tv"></i> dizi_ara.
+                                </button>
+                            </div>
                             <div class="search-bar">
                                 <input
                                     type="text"
@@ -377,6 +385,29 @@
                     </section>
                 </div>
             </main>
+        </div>
+
+        <!-- Sezon & Bölüm Seçim Modalı -->
+        <div id="series-modal" class="modal-overlay hidden">
+            <div class="modal-content glass">
+                <div class="modal-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="fa-solid fa-tv" style="color: var(--primary); font-size: 1.5rem;"></i>
+                        <h2 id="modal-series-title">dizi_adi.</h2>
+                    </div>
+                    <button id="btn-close-modal" class="btn btn-danger btn-small">
+                        <i class="fa-solid fa-xmark"></i> kapat.
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="modal-seasons-bar" class="seasons-bar">
+                        <!-- Sezon Butonları dinamik eklenecek -->
+                    </div>
+                    <div id="modal-episodes-list" class="episodes-list">
+                        <!-- Bölümler buraya dinamik eklenecek -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <footer class="app-footer">

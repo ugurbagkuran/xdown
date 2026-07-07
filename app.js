@@ -36,6 +36,16 @@ const elBtnSearch = document.getElementById("btn-search");
 const elFilmGrid = document.getElementById("film-grid");
 const elDownloadQueue = document.getElementById("download-queue");
 
+// Series Modal DOM Elements
+const elSeriesModal = document.getElementById("series-modal");
+const elModalSeriesTitle = document.getElementById("modal-series-title");
+const elBtnCloseModal = document.getElementById("btn-close-modal");
+const elModalSeasonsBar = document.getElementById("modal-seasons-bar");
+const elModalEpisodesList = document.getElementById("modal-episodes-list");
+
+// Active search type state ('movie' or 'series')
+let activeSearchType = "movie";
+
 // App State
 let segmentList = [];
 let sampleBytes = null;
@@ -60,6 +70,26 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.classList.add("active");
     document.getElementById(btn.dataset.tab).classList.add("active");
   });
+});
+
+// ── Search Type Selector Logic ──────────────────────────────────────────────
+document.querySelectorAll(".type-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".type-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeSearchType = btn.dataset.type;
+    
+    if (activeSearchType === "series") {
+      elSearchInput.placeholder = "aranacak dizi adını girin (Breaking Bad, vb.)...";
+    } else {
+      elSearchInput.placeholder = "aranacak film adını girin...";
+    }
+  });
+});
+
+// Close Series Modal
+elBtnCloseModal.addEventListener("click", () => {
+  elSeriesModal.classList.add("hidden");
 });
 
 // ── Search Logic ─────────────────────────────────────────────────────────────
@@ -107,11 +137,11 @@ async function doSearch() {
     '<div class="search-empty"><i class="fa-solid fa-spinner fa-spin" style="font-size:30px;margin-bottom:12px;display:block;"></i>aranıyor...</div>';
 
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&type=${activeSearchType}`);
     const data = await res.json();
     if (!data.success || data.films.length === 0) {
       elFilmGrid.innerHTML =
-        '<div class="search-empty"><i class="fa-solid fa-terminal" style="font-size:40px;margin-bottom:12px;display:block;opacity:.3;"></i>film bulunamadı.</div>';
+        `<div class="search-empty"><i class="fa-solid fa-terminal" style="font-size:40px;margin-bottom:12px;display:block;opacity:.3;"></i>${activeSearchType === "series" ? "dizi" : "film"} bulunamadı.</div>`;
       return;
     }
     renderFilmGrid(data.films);
@@ -129,7 +159,7 @@ function renderFilmGrid(films) {
       (f) => `
     <div class="film-card" data-url="${f.url}" data-title="${f.title}">
       <img src="${f.poster || ""}" alt="${f.title}" onerror="this.src='https://via.placeholder.com/160x240/111/555?text=?'">
-      <div class="film-card-overlay"><span><i class="fa-solid fa-download"></i> indir.</span></div>
+      <div class="film-card-overlay"><span><i class="fa-solid fa-download"></i> ${activeSearchType === "series" ? "bölümler." : "indir."}</span></div>
       <div class="film-card-body">
         <div class="film-card-title">${f.title}</div>
         <div class="film-card-meta">
@@ -143,9 +173,13 @@ function renderFilmGrid(films) {
     .join("");
 
   document.querySelectorAll(".film-card").forEach((card) => {
-    card.addEventListener("click", () =>
-      autoDownloadFilm(card.dataset.url, card.dataset.title),
-    );
+    card.addEventListener("click", () => {
+      if (activeSearchType === "series") {
+        showSeriesDetails(card.dataset.url, card.dataset.title);
+      } else {
+        autoDownloadFilm(card.dataset.url, card.dataset.title);
+      }
+    });
   });
 }
 
@@ -792,4 +826,193 @@ function appendLog(message) {
   div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   elLogTerminal.appendChild(div);
   elLogTerminal.scrollTop = elLogTerminal.scrollHeight;
+}
+
+// ─── DIZIYOU SERIES MANAGEMENT & UI RENDERING ─────────────────────────────
+
+// Dynamic cache of extracted episode details to avoid refetching on toggle
+const episodeDetailsCache = new Map(); // episodeUrl -> streams data
+
+// Show series detail modal
+async function showSeriesDetails(url, title) {
+  elModalSeriesTitle.textContent = title;
+  elModalSeasonsBar.innerHTML = "";
+  elModalEpisodesList.innerHTML = '<div class="options-loading"><i class="fa-solid fa-spinner fa-spin"></i> sezonlar yükleniyor...</div>';
+  elSeriesModal.classList.remove("hidden");
+
+  try {
+    const response = await fetch(`/api/series-detail?url=${encodeURIComponent(url)}`);
+    const data = await response.json();
+    if (!data.success || data.seasons.length === 0) {
+      elModalEpisodesList.innerHTML = '<div class="search-empty" style="color: var(--accent-red);">Bölüm bilgisi alınamadı.</div>';
+      return;
+    }
+
+    renderSeasonsAndEpisodes(data.seasons, title);
+  } catch (err) {
+    elModalEpisodesList.innerHTML = `<div class="search-empty" style="color: var(--accent-red);">Hata: ${err.message}</div>`;
+  }
+}
+
+// Render seasons bar and episodes
+function renderSeasonsAndEpisodes(seasons, seriesTitle) {
+  elModalSeasonsBar.innerHTML = "";
+  
+  // Render season buttons
+  seasons.forEach((s, index) => {
+    const btn = document.createElement("button");
+    btn.className = `season-btn ${index === 0 ? "active" : ""}`;
+    btn.textContent = `${s.season}. Sezon`;
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".season-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderEpisodes(s.episodes, seriesTitle);
+    });
+    elModalSeasonsBar.appendChild(btn);
+  });
+
+  // Render first season by default
+  renderEpisodes(seasons[0].episodes, seriesTitle);
+}
+
+// Render episodes of selected season
+function renderEpisodes(episodes, seriesTitle) {
+  elModalEpisodesList.innerHTML = "";
+  
+  episodes.forEach(ep => {
+    const item = document.createElement("div");
+    item.className = "episode-item";
+    item.dataset.url = ep.url;
+    item.dataset.title = ep.title;
+    
+    // Episode main bar (header)
+    const mainBar = document.createElement("div");
+    mainBar.className = "episode-main";
+    mainBar.innerHTML = `
+      <div class="episode-title">
+        <span>${ep.season}. Sezon ${ep.episode}. Bölüm</span>
+        <span class="episode-name">${ep.name}</span>
+      </div>
+      <button class="episode-action-btn">seçenekler.</button>
+    `;
+    
+    // Details panel containing download and subtitles options
+    const detailsPanel = document.createElement("div");
+    detailsPanel.className = "episode-details-panel";
+    detailsPanel.innerHTML = '<div class="options-loading"><i class="fa-solid fa-spinner fa-spin"></i> yayın kaynakları yükleniyor...</div>';
+    
+    item.appendChild(mainBar);
+    item.appendChild(detailsPanel);
+    elModalEpisodesList.appendChild(item);
+    
+    // Click behavior to slide-down / load options
+    mainBar.addEventListener("click", () => {
+      const isActive = item.classList.contains("active");
+      
+      // Close other active episode items in this modal view
+      document.querySelectorAll(".episode-item").forEach(el => el.classList.remove("active"));
+      
+      if (!isActive) {
+        item.classList.add("active");
+        loadEpisodeOptions(ep.url, detailsPanel, seriesTitle, ep.season, ep.episode);
+      }
+    });
+  });
+}
+
+// Load player / stream options dynamically
+async function loadEpisodeOptions(episodeUrl, container, seriesTitle, seasonNum, episodeNum) {
+  // Check cache first
+  if (episodeDetailsCache.has(episodeUrl)) {
+    renderEpisodeOptions(episodeDetailsCache.get(episodeUrl), container, seriesTitle, seasonNum, episodeNum);
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/extract-series-video?url=${encodeURIComponent(episodeUrl)}`);
+    const data = await response.json();
+    if (!data.success || data.streams.length === 0) {
+      container.innerHTML = '<div class="options-loading" style="color: var(--accent-red);"><i class="fa-solid fa-triangle-exclamation"></i> Yayın kaynağı çıkarılamadı.</div>';
+      return;
+    }
+    
+    // Cache the data
+    episodeDetailsCache.set(episodeUrl, data.streams);
+    renderEpisodeOptions(data.streams, container, seriesTitle, seasonNum, episodeNum);
+  } catch (err) {
+    container.innerHTML = `<div class="options-loading" style="color: var(--accent-red);">Hata: ${err.message}</div>`;
+  }
+}
+
+// Render option rows inside selected episode panel
+function renderEpisodeOptions(streams, container, seriesTitle, seasonNum, episodeNum) {
+  container.innerHTML = "";
+  
+  const optionsWrapper = document.createElement("div");
+  optionsWrapper.className = "stream-options-container";
+  
+  streams.forEach(stream => {
+    const row = document.createElement("div");
+    row.className = "stream-option-row";
+    
+    // Create slug-like safe output name
+    const cleanSeriesName = seriesTitle.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_");
+    const pad = (num) => String(num).padStart(2, "0");
+    const cleanStreamName = stream.name.replace(/[^a-zA-Z0-9]/g, "_").replace(/_+/g, "_");
+    const outputName = `${cleanSeriesName}_S${pad(seasonNum)}E${pad(episodeNum)}_${cleanStreamName}.ts`;
+    
+    // Check if subtitles exist
+    let subButtonsHtml = "";
+    if (stream.subtitles && stream.subtitles.length > 0) {
+      stream.subtitles.forEach(sub => {
+        subButtonsHtml += `
+          <button class="opt-sub-btn" data-sub-url="${sub.src}" data-sub-name="${cleanSeriesName}_S${pad(seasonNum)}E${pad(episodeNum)}_${sub.label}.vtt">
+            <i class="fa-solid fa-closed-captioning"></i> altyazı_${sub.label.toLowerCase()}.
+          </button>
+        `;
+      });
+    }
+
+    row.innerHTML = `
+      <span class="stream-option-title">${stream.name}</span>
+      <div class="stream-option-actions">
+        ${subButtonsHtml}
+        <button class="opt-dl-btn" data-m3u8-url="${stream.m3u8Url}" data-output="${outputName}">
+          <i class="fa-solid fa-download"></i> indir.
+        </button>
+      </div>
+    `;
+    
+    // Add event listeners to buttons
+    row.querySelector(".opt-dl-btn").addEventListener("click", () => {
+      // Start task download process in parallel
+      autoDownloadFilm(stream.m3u8Url, outputName);
+      // Close modal on action
+      elSeriesModal.classList.add("hidden");
+    });
+    
+    row.querySelectorAll(".opt-sub-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation(); // prevent panel click propagation
+        const subUrl = btn.dataset.subUrl;
+        const subName = btn.dataset.subName;
+        downloadSubtitleInBrowser(subUrl, subName);
+      });
+    });
+
+    optionsWrapper.appendChild(row);
+  });
+  
+  container.appendChild(optionsWrapper);
+}
+
+// Download subtitle file directly in the browser
+function downloadSubtitleInBrowser(url, filename) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.setAttribute("download", filename);
+  a.target = "_blank";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }

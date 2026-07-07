@@ -87,41 +87,75 @@ function fetchBuffer(url, headers = {}, redirectCount = 0) {
 
 // ─── SEARCH & AUTO-EXTRACT ENDPOINTS ─────────────────────────────────────────
 
-// 1) Search: fullhdfilmizle.mom/?s=query
+// 1) Search: fullhdfilmizle.mom/?s=query (movie) or diziyou.one/?s=query (series)
 app.get("/api/search", async (req, res) => {
-  const { q } = req.query;
+  const { q, type } = req.query;
   if (!q) return res.status(400).json({ error: "Arama terimi gerekli." });
-  try {
-    const searchUrl = `https://www.fullhdfilmizle.mom/?s=${encodeURIComponent(q)}`;
-    const buf = await fetchBuffer(searchUrl, {
-      Referer: "https://www.fullhdfilmizle.mom/",
-    });
-    const html = buf.toString("utf-8");
-    const films = [];
-    const blocks = html.split('<div class="movie-box">').slice(1);
-    for (const block of blocks) {
-      const hrefM = block.match(
-        /href="(https:\/\/www\.fullhdfilmizle\.mom\/[^"]+)"/,
-      );
-      const titleM = block.match(
-        /<div class="film-ismi">\s*<a[^>]*>([^<]+)<\/a>/,
-      );
-      const posterM = block.match(/data-src="([^"]+)"/);
-      const yearM = block.match(/<div class="film-yil">[^0-9]*(\d{4})/);
-      const ratingM = block.match(/<div class="bolum-ust">[^0-9]*([0-9.]+)/);
-      if (hrefM && titleM) {
-        films.push({
-          url: hrefM[1],
-          title: titleM[1].trim(),
-          poster: posterM ? posterM[1] : null,
-          year: yearM ? yearM[1] : null,
-          rating: ratingM ? ratingM[1] : null,
-        });
+  
+  if (type === "series") {
+    try {
+      const searchUrl = `https://www.diziyou.one/?s=${encodeURIComponent(q)}`;
+      const buf = await fetchBuffer(searchUrl, {
+        Referer: "https://www.diziyou.one/",
+      });
+      const html = buf.toString("utf-8");
+      const films = [];
+      const blocks = html.split('class="cat-img"').slice(1);
+      for (const block of blocks) {
+        const hrefM = block.match(/href="([^"]+)"/);
+        const posterM = block.match(/<img\s+[^>]*src="([^"]+)"/) || block.match(/<img\s+[^>]*data-src="([^"]+)"/);
+        const titleM = block.match(/id="categorytitle"><a[^>]*>([^<]+)<\/a>/) || block.match(/id="categorytitle">[^<]*<a[^>]*>([^<]+)<\/a>/);
+        const ratingM = block.match(/id="imdbp">\s*\(([^)]+)\)/);
+        
+        if (hrefM && titleM) {
+          films.push({
+            url: hrefM[1],
+            title: titleM[1].trim(),
+            poster: posterM ? posterM[1] : null,
+            year: null,
+            rating: ratingM ? ratingM[1] : null,
+            type: "series"
+          });
+        }
       }
+      res.json({ success: true, films });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
     }
-    res.json({ success: true, films });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } else {
+    try {
+      const searchUrl = `https://www.fullhdfilmizle.mom/?s=${encodeURIComponent(q)}`;
+      const buf = await fetchBuffer(searchUrl, {
+        Referer: "https://www.fullhdfilmizle.mom/",
+      });
+      const html = buf.toString("utf-8");
+      const films = [];
+      const blocks = html.split('<div class="movie-box">').slice(1);
+      for (const block of blocks) {
+        const hrefM = block.match(
+          /href="(https:\/\/www\.fullhdfilmizle\.mom\/[^"]+)"/,
+        );
+        const titleM = block.match(
+          /<div class="film-ismi">\s*<a[^>]*>([^<]+)<\/a>/,
+        );
+        const posterM = block.match(/data-src="([^"]+)"/);
+        const yearM = block.match(/<div class="film-yil">[^0-9]*(\d{4})/);
+        const ratingM = block.match(/<div class="bolum-ust">[^0-9]*([0-9.]+)/);
+        if (hrefM && titleM) {
+          films.push({
+            url: hrefM[1],
+            title: titleM[1].trim(),
+            poster: posterM ? posterM[1] : null,
+            year: yearM ? yearM[1] : null,
+            rating: ratingM ? ratingM[1] : null,
+            type: "movie"
+          });
+        }
+      }
+      res.json({ success: true, films });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   }
 });
 
@@ -1037,6 +1071,138 @@ function convertToMp4(inputTs, outputMp4, state) {
     );
   });
 }
+
+// ─── DIZIYOU SERIES DETAILS & VIDEO EXTRACTION ENDPOINTS ───────────────────
+
+// 1) Get season and episodes from series URL
+app.get("/api/series-detail", async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: "Dizi URL'si gerekli." });
+  try {
+    const buf = await fetchBuffer(url, {
+      Referer: "https://www.diziyou.one/",
+    });
+    const html = buf.toString("utf-8");
+    
+    // Find all episodes
+    // Structure: <a href="https://www.diziyou.one/breaking-bad-1-sezon-1-bolum/"><div class="bolumust">...
+    const episodeRe = /<a\s+href="(https:\/\/www\.diziyou\.one\/([^"]+?)-([0-9]+)-sezon-([0-9]+)-bolum\/)"[^>]*>\s*<div class="bolumust">[\s\S]*?<div class="baslik">\s*([0-9]+)\.\s*Sezon\s*([0-9]+)\.\s*Bölüm\s*(?:<div[^>]*class="bolumismi"[^>]*>\s*([^<]*?)\s*<\/div>)?/gi;
+    
+    const seasonsMap = new Map();
+    let m;
+    while ((m = episodeRe.exec(html)) !== null) {
+      const fullUrl = m[1];
+      const slug = m[2];
+      const seasonNum = parseInt(m[3], 10);
+      const episodeNum = parseInt(m[4], 10);
+      const episodeName = m[7] ? m[7].trim() : "";
+      
+      if (!seasonsMap.has(seasonNum)) {
+        seasonsMap.set(seasonNum, []);
+      }
+      
+      seasonsMap.get(seasonNum).push({
+        url: fullUrl,
+        season: seasonNum,
+        episode: episodeNum,
+        name: episodeName || `${episodeNum}. Bölüm`,
+        title: `${seasonNum}. Sezon ${episodeNum}. Bölüm ${episodeName ? `(${episodeName})` : ""}`
+      });
+    }
+    
+    // Sort seasons and episodes
+    const seasons = [];
+    const sortedSeasonKeys = Array.from(seasonsMap.keys()).sort((a, b) => a - b);
+    for (const sKey of sortedSeasonKeys) {
+      const eps = seasonsMap.get(sKey).sort((a, b) => a.episode - b.episode);
+      seasons.push({
+        season: sKey,
+        episodes: eps
+      });
+    }
+    
+    res.json({ success: true, seasons });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2) Extract m3u8 stream and subtitle links from episode URL
+app.get("/api/extract-series-video", async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: "Bölüm URL'si gerekli." });
+  try {
+    const buf = await fetchBuffer(url, {
+      Referer: "https://www.diziyou.one/",
+    });
+    const html = buf.toString("utf-8");
+    
+    // Find diziyouPlayer iframe
+    // <iframe id="diziyouPlayer" src="https://www.diziyou.one/player/10551.html?next=..."
+    const iframeM = html.match(/<iframe[^>]*id="diziyouPlayer"[^>]*src="([^"]+)"/) || html.match(/id="diziyouPlayer"\s+src="([^"]+)"/);
+    if (!iframeM) {
+      return res.status(422).json({ success: false, error: "Oynatıcı iframe'i bulunamadı." });
+    }
+    
+    const playerUrlStr = iframeM[1];
+    const playerUrlParsed = new URL(playerUrlStr);
+    const basePath = playerUrlParsed.origin + playerUrlParsed.pathname; // https://www.diziyou.one/player/10551.html
+    
+    const streams = [];
+    const variants = [
+      { name: "Türkçe Altyazılı", suffix: "" },
+      { name: "Türkçe Dublaj", suffix: "_tr" },
+      { name: "İngilizce Altyazılı", suffix: "_enSub" }
+    ];
+    
+    for (const variant of variants) {
+      let variantUrl;
+      if (variant.suffix === "") {
+        variantUrl = basePath;
+      } else {
+        variantUrl = basePath.replace(".html", `${variant.suffix}.html`);
+      }
+      
+      try {
+        const pBuf = await fetchBuffer(variantUrl, {
+          Referer: url,
+        });
+        const pHtml = pBuf.toString("utf-8");
+        const m3u8M = pHtml.match(/<source[^>]*src="([^"]*\.m3u8[^"]*)"/) || pHtml.match(/id="diziyouSource"\s+src="([^"]+)"/);
+        
+        // Find subtitles
+        const subtitles = [];
+        const subtitleRe = /<track[^>]*src="([^"]*\.vtt[^"]*)"[^>]*srclang="([^"]*)"[^>]*label="([^"]*)"/gi;
+        let subM;
+        while ((subM = subtitleRe.exec(pHtml)) !== null) {
+          subtitles.push({
+            src: subM[1],
+            lang: subM[2],
+            label: subM[3]
+          });
+        }
+        
+        if (m3u8M) {
+          streams.push({
+            name: variant.name,
+            m3u8Url: m3u8M[1],
+            subtitles: subtitles
+          });
+        }
+      } catch (e) {
+        console.log(`Diziyou player opsiyonu yüklenemedi (${variant.name}): ${e.message}`);
+      }
+    }
+    
+    if (streams.length === 0) {
+      return res.status(422).json({ success: false, error: "Oynatıcıda geçerli yayın kaynağı bulunamadı." });
+    }
+    
+    res.json({ success: true, streams });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Progress endpoint (Polling style)
 app.get("/api/task-status/:taskId", (req, res) => {
