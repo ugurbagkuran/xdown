@@ -526,6 +526,85 @@ app.get("/api/extract-stream", async (req, res) => {
   }
 });
 
+// Helper to parse media/segment playlist and return analysis JSON
+async function parseMediaPlaylist(contentStr, playlistUrl, res, extraHeaders) {
+  const lines = contentStr.split("\n");
+  const segments = [];
+  const baseUrl = new URL(playlistUrl);
+
+  for (let line of lines) {
+    line = line.trim();
+    if (line && !line.startsWith("#")) {
+      const resolvedUrl = new URL(line, baseUrl).toString();
+      segments.push(resolvedUrl);
+    }
+  }
+
+  if (segments.length === 0) {
+    return res.json({
+      success: true,
+      isPlaylist: true,
+      totalSegments: 0,
+      segments: [],
+      error: "M3U8 çalma listesinde segment bulunamadı.",
+    });
+  }
+
+  try {
+    const firstSegUrl = segments[0];
+    const segBuffer = await fetchBuffer(firstSegUrl, extraHeaders);
+    const firstBytesHex = segBuffer
+      .slice(0, 16)
+      .toString("hex")
+      .match(/../g)
+      .join(" ");
+
+    let suggestion = {
+      method: "none",
+      confidence: "low",
+      details: "Bilinmeyen format",
+    };
+    const cleanTsOffset = detectTsOffset(segBuffer);
+    if (cleanTsOffset === 0) {
+      suggestion = {
+        method: "none",
+        confidence: "high",
+        details: "Doğrudan geçerli TS formatı.",
+      };
+    } else if (cleanTsOffset > 0) {
+      suggestion = {
+        method: "strip",
+        stripBytes: cleanTsOffset,
+        confidence: "high",
+        details: `İlk ${cleanTsOffset} byte sahte PNG/meta verisi içeriyor, sonrasında TS formatı başlıyor.`,
+      };
+    } else {
+      const xorKey = detectXorKey(segBuffer);
+      if (xorKey !== -1) {
+        suggestion = {
+          method: "xor",
+          key: `0x${xorKey.toString(16).padStart(2, "0")}`,
+          confidence: "high",
+          details: `Tek byte XOR şifreleme tespit edildi. Anahtar: 0x${xorKey.toString(16).toUpperCase()}`,
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      isPlaylist: true,
+      totalSegments: segments.length,
+      segments,
+      size: segBuffer.length,
+      firstBytesHex,
+      rawBytesBase64: segBuffer.slice(0, 512).toString("base64"),
+      suggestion,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: `Segment analizi hatası: ${err.message}` });
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Unified Analyze Endpoint: Auto detects if the URL is a playlist or a direct segment
@@ -543,79 +622,54 @@ app.get("/api/analyze", async (req, res) => {
     const contentStr = buffer.toString("utf-8").trim();
 
     if (contentStr.startsWith("#EXTM3U")) {
-      // It's a playlist!
-      const lines = contentStr.split("\n");
-      const segments = [];
-      const baseUrl = new URL(url);
+      const isMasterPlaylist = contentStr.includes("#EXT-X-STREAM-INF");
 
-      for (let line of lines) {
-        line = line.trim();
-        if (line && !line.startsWith("#")) {
-          const resolvedUrl = new URL(line, baseUrl).toString();
-          segments.push(resolvedUrl);
+      if (isMasterPlaylist) {
+        const lines = contentStr.split("\n");
+        const baseUrl = new URL(url);
+        let bestPlaylistUrl = null;
+        let maxResolution = 0;
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.startsWith("#EXT-X-STREAM-INF")) {
+            const resMatch = line.match(/RESOLUTION=(\d+)x(\d+)/i);
+            let width = 0;
+            if (resMatch) {
+              width = parseInt(resMatch[1], 10);
+            }
+            
+            const bwMatch = line.match(/BANDWIDTH=(\d+)/i);
+            let bw = bwMatch ? parseInt(bwMatch[1], 10) : 0;
+            
+            let nextLineUrl = null;
+            for (let j = i + 1; j < lines.length; j++) {
+              const nextLine = lines[j].trim();
+              if (nextLine && !nextLine.startsWith("#")) {
+                nextLineUrl = nextLine;
+                break;
+              }
+            }
+            
+            if (nextLineUrl) {
+              const score = width > 0 ? width : bw;
+              if (score > maxResolution || !bestPlaylistUrl) {
+                maxResolution = score;
+                bestPlaylistUrl = new URL(nextLineUrl, baseUrl).toString();
+              }
+            }
+          }
+        }
+        
+        if (bestPlaylistUrl) {
+          console.log(`Master playlist algılandı. En iyi kalite playlist seçildi: ${bestPlaylistUrl}`);
+          const subBuffer = await fetchBuffer(bestPlaylistUrl, extraHeaders);
+          const subContentStr = subBuffer.toString("utf-8").trim();
+          return parseMediaPlaylist(subContentStr, bestPlaylistUrl, res, extraHeaders);
         }
       }
 
-      if (segments.length === 0) {
-        return res.json({
-          success: true,
-          isPlaylist: true,
-          totalSegments: 0,
-          segments: [],
-          error: "M3U8 çalma listesinde segment bulunamadı.",
-        });
-      }
-
-      // Analyze the first segment of the playlist
-      const firstSegUrl = segments[0];
-      const segBuffer = await fetchBuffer(firstSegUrl, extraHeaders);
-      const firstBytesHex = segBuffer
-        .slice(0, 16)
-        .toString("hex")
-        .match(/../g)
-        .join(" ");
-
-      let suggestion = {
-        method: "none",
-        confidence: "low",
-        details: "Bilinmeyen format",
-      };
-      const cleanTsOffset = detectTsOffset(segBuffer);
-      if (cleanTsOffset === 0) {
-        suggestion = {
-          method: "none",
-          confidence: "high",
-          details: "Doğrudan geçerli TS formatı.",
-        };
-      } else if (cleanTsOffset > 0) {
-        suggestion = {
-          method: "strip",
-          stripBytes: cleanTsOffset,
-          confidence: "high",
-          details: `İlk ${cleanTsOffset} byte sahte PNG/meta verisi içeriyor, sonrasında TS formatı başlıyor.`,
-        };
-      } else {
-        const xorKey = detectXorKey(segBuffer);
-        if (xorKey !== -1) {
-          suggestion = {
-            method: "xor",
-            key: `0x${xorKey.toString(16).padStart(2, "0")}`,
-            confidence: "high",
-            details: `Tek byte XOR şifreleme tespit edildi. Anahtar: 0x${xorKey.toString(16).toUpperCase()}`,
-          };
-        }
-      }
-
-      res.json({
-        success: true,
-        isPlaylist: true,
-        totalSegments: segments.length,
-        segments,
-        size: segBuffer.length,
-        firstBytesHex,
-        rawBytesBase64: segBuffer.slice(0, 512).toString("base64"),
-        suggestion,
-      });
+      return parseMediaPlaylist(contentStr, url, res, extraHeaders);
     } else {
       // It's a direct segment!
       const firstBytesHex = buffer
