@@ -16,14 +16,184 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// Disable caching for all API responses
+app.use("/api", (req, res, next) => {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 // Global tasks map
 const tasks = new Map();
+
+// Global task queue for download tasks (Max 2 concurrent)
+const taskQueue = [];
+let activeRunningTasks = 0;
+const MAX_CONCURRENT_TASKS = 2;
+
+function processTaskQueue() {
+  if (taskQueue.length === 0) return;
+  if (activeRunningTasks >= MAX_CONCURRENT_TASKS) return;
+
+  const nextTask = taskQueue.shift();
+  activeRunningTasks++;
+
+  console.log(`[Task Queue] Görev başlatılıyor: ${nextTask.taskId}. Kalan kuyruk: ${taskQueue.length}`);
+  
+  // Set task state status to running
+  const state = tasks.get(nextTask.taskId);
+  if (state) {
+    state.status = "running";
+  }
+
+  runTask(nextTask.taskId, nextTask.urls, nextTask.outputPath, nextTask.options)
+    .catch((err) => {
+      console.error(`[Task Queue] Görev hatayla sonuçlandı: ${nextTask.taskId}`, err.message);
+    })
+    .finally(() => {
+      activeRunningTasks--;
+      processTaskQueue();
+    });
+}
 
 // Keep-alive agents for connection reuse across segments
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 32 });
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 32 });
 
 // Helper to download a file to a buffer with default browser headers
+function fetchContentLength(url, headers = {}, redirectCount = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirectCount > 5) {
+      return reject(new Error("Çok fazla yönlendirme (Redirect loop)"));
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      const isHttps = url.startsWith("https");
+      const defaultHeaders = {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Referer:
+          headers.Referer ||
+          headers.referer ||
+          `${parsedUrl.protocol}//${parsedUrl.host}/`,
+        Origin:
+          headers.Origin ||
+          headers.origin ||
+          `${parsedUrl.protocol}//${parsedUrl.host}`,
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "cross-site",
+        Connection: "keep-alive",
+        ...headers,
+      };
+
+      const client = isHttps ? https : http;
+      const agent = isHttps ? httpsAgent : httpAgent;
+      const req = client.request(
+        url,
+        { method: "HEAD", headers: defaultHeaders, agent, timeout: 8000 },
+        (res) => {
+          if (
+            [301, 302, 303, 307, 308].includes(res.statusCode) &&
+            res.headers.location
+          ) {
+            res.resume();
+            const redirectUrl = new URL(res.headers.location, url).toString();
+            return fetchContentLength(redirectUrl, headers, redirectCount + 1)
+              .then(resolve)
+              .catch(reject);
+          }
+
+          res.resume();
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`HTTP Status ${res.statusCode}`));
+            return;
+          }
+
+          const length = Number.parseInt(res.headers["content-length"], 10);
+          resolve(Number.isFinite(length) ? length : null);
+        },
+      );
+      req.on("timeout", () => {
+        req.destroy();
+        reject(new Error("Bağlantı zaman aşımı (8s)"));
+      });
+      req.on("error", (err) => reject(err));
+      req.end();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+async function estimateSegmentsSize(segments, extraHeaders, firstSegmentSize) {
+  const maxMeasuredSegments = Math.min(80, segments.length);
+  const sampleIndices = Array.from(
+    new Set(
+      Array.from({ length: maxMeasuredSegments }, (_, i) => {
+        if (maxMeasuredSegments === 1) return 0;
+        return Math.round(
+          (i * (segments.length - 1)) / (maxMeasuredSegments - 1),
+        );
+      }),
+    ),
+  ).sort((a, b) => a - b);
+
+  const measuredSizes = [];
+  if (sampleIndices.includes(0) && firstSegmentSize) {
+    measuredSizes.push(firstSegmentSize);
+  }
+
+  let cursor = 0;
+  const workerCount = Math.min(8, Math.max(1, sampleIndices.length));
+
+  const worker = async () => {
+    while (cursor < sampleIndices.length) {
+      const index = sampleIndices[cursor++];
+      if (index === 0 && firstSegmentSize) continue;
+      try {
+        const size = await fetchContentLength(segments[index], extraHeaders);
+        if (size !== null) measuredSizes.push(size);
+      } catch (_) {}
+    }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, worker));
+
+  if (measuredSizes.length === segments.length) {
+    return {
+      bytes: measuredSizes.reduce((sum, size) => sum + size, 0),
+      exact: true,
+      measuredSegments: measuredSizes.length,
+      method: "all-segments",
+    };
+  }
+
+  const measuredAverage =
+    measuredSizes.length > 0
+      ? measuredSizes.reduce((sum, size) => sum + size, 0) /
+        measuredSizes.length
+      : firstSegmentSize || 0;
+
+  return {
+    bytes: Math.round(measuredAverage * segments.length),
+    exact: false,
+    measuredSegments: measuredSizes.length,
+    method: "even-sample",
+  };
+}
+
+function scheduleTaskCleanup(taskId, delayMs = 10 * 60 * 1000) {
+  setTimeout(() => {
+    tasks.delete(taskId);
+  }, delayMs).unref?.();
+}
+
 function fetchBuffer(url, headers = {}, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     if (redirectCount > 5)
@@ -35,8 +205,14 @@ function fetchBuffer(url, headers = {}, redirectCount = 0) {
       const defaultHeaders = {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Referer: headers.Referer || headers.referer || `${parsedUrl.protocol}//${parsedUrl.host}/`,
-        Origin: headers.Origin || headers.origin || `${parsedUrl.protocol}//${parsedUrl.host}`,
+        Referer:
+          headers.Referer ||
+          headers.referer ||
+          `${parsedUrl.protocol}//${parsedUrl.host}/`,
+        Origin:
+          headers.Origin ||
+          headers.origin ||
+          `${parsedUrl.protocol}//${parsedUrl.host}`,
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "cross-site",
@@ -85,13 +261,20 @@ function fetchBuffer(url, headers = {}, redirectCount = 0) {
   });
 }
 
+// Client Logging Endpoint
+app.post("/api/log", (req, res) => {
+  const { type, message } = req.body;
+  console.log(`[CLIENT ${type || 'ERROR'}]`, message);
+  res.sendStatus(200);
+});
+
 // ─── SEARCH & AUTO-EXTRACT ENDPOINTS ─────────────────────────────────────────
 
 // 1) Search: fullhdfilmizle.mom/?s=query (movie) or diziyou.one/?s=query (series)
 app.get("/api/search", async (req, res) => {
   const { q, type } = req.query;
   if (!q) return res.status(400).json({ error: "Arama terimi gerekli." });
-  
+
   if (type === "series") {
     try {
       const searchUrl = `https://www.diziyou.one/?s=${encodeURIComponent(q)}`;
@@ -103,10 +286,14 @@ app.get("/api/search", async (req, res) => {
       const blocks = html.split('class="cat-img"').slice(1);
       for (const block of blocks) {
         const hrefM = block.match(/href="([^"]+)"/);
-        const posterM = block.match(/<img\s+[^>]*src="([^"]+)"/) || block.match(/<img\s+[^>]*data-src="([^"]+)"/);
-        const titleM = block.match(/id="categorytitle"><a[^>]*>([^<]+)<\/a>/) || block.match(/id="categorytitle">[^<]*<a[^>]*>([^<]+)<\/a>/);
+        const posterM =
+          block.match(/<img\s+[^>]*src="([^"]+)"/) ||
+          block.match(/<img\s+[^>]*data-src="([^"]+)"/);
+        const titleM =
+          block.match(/id="categorytitle"><a[^>]*>([^<]+)<\/a>/) ||
+          block.match(/id="categorytitle">[^<]*<a[^>]*>([^<]+)<\/a>/);
         const ratingM = block.match(/id="imdbp">\s*\(([^)]+)\)/);
-        
+
         if (hrefM && titleM) {
           films.push({
             url: hrefM[1],
@@ -114,7 +301,7 @@ app.get("/api/search", async (req, res) => {
             poster: posterM ? posterM[1] : null,
             year: null,
             rating: ratingM ? ratingM[1] : null,
-            type: "series"
+            type: "series",
           });
         }
       }
@@ -148,7 +335,7 @@ app.get("/api/search", async (req, res) => {
             poster: posterM ? posterM[1] : null,
             year: yearM ? yearM[1] : null,
             rating: ratingM ? ratingM[1] : null,
-            type: "movie"
+            type: "movie",
           });
         }
       }
@@ -176,35 +363,67 @@ app.get("/api/extract-player", async (req, res) => {
       html.match(/Change_Source\('(\d+)'/);
     if (postIdM) postId = postIdM[1];
 
-    // Change_Source('<postId>','<playerName>','<partKey>', this) — partKey belirtir
-    // hangi ses/altyazı bölümüne (Türkçe Dublaj / Türkçe Altyazılı vb.) ait olduğunu.
-    // Site birden fazla "part" barındırabildiği için, boş part_key ile admin-ajax çoğu
-    // zaman "Video not found" döner. Varsayılan (ilk/gösterilen) part'ın key'ini kullanırız.
-    const players = [];
-    let defaultPartKey = "";
-    let sawFirstPart = false;
-    const playerRe = /onclick="Change_Source\('\d+','([^']+)','([^']*)'/g;
-    let m;
-    while ((m = playerRe.exec(html)) !== null) {
-      const [, playerName, partKey] = m;
-      if (!sawFirstPart) {
-        defaultPartKey = partKey;
-        sawFirstPart = true;
-      }
-      if (partKey === defaultPartKey && !players.includes(playerName))
-        players.push(playerName);
-    }
     if (!nonceM || !postId) {
       return res
         .status(422)
         .json({ success: false, error: "Post ID veya nonce bulunamadi." });
     }
+
+    // Extract languages/sources
+    const languages = [];
+    const langRe = /switchLanguage\('([^']+)'\)/g;
+    let lm;
+    const seenLangs = new Set();
+    while ((lm = langRe.exec(html)) !== null) {
+      const langKey = lm[1];
+      if (!seenLangs.has(langKey)) {
+        seenLangs.add(langKey);
+        let label = "Türkçe Seçenek";
+        if (langKey.includes("dublaj")) label = "Türkçe Dublaj";
+        else if (langKey.includes("altyazi")) label = "Türkçe Altyazılı";
+        else if (langKey.includes("orjinal")) label = "Orijinal Dil";
+        languages.push({ key: langKey, label });
+      }
+    }
+
+    if (languages.length === 0) {
+      languages.push({ key: "", label: "Türkçe Dublaj" });
+    }
+
+    const sources = {};
+    const playerRe = /Change_Source\('\d+','([^']+)','?([^')]*?)'?\s*(?:,|\))/g;
+    let pm;
+    while ((pm = playerRe.exec(html)) !== null) {
+      const playerName = pm[1];
+      let partKey = pm[2].trim();
+      if (partKey === "this") partKey = "";
+
+      if (!sources[partKey]) {
+        sources[partKey] = [];
+      }
+      if (!sources[partKey].includes(playerName)) {
+        sources[partKey].push(playerName);
+      }
+    }
+
+    // Fallback: If no sources parsed for the keys, copy players
+    languages.forEach(l => {
+      if (!sources[l.key] || sources[l.key].length === 0) {
+        // Find any players from the whole page as fallback
+        const allPlayers = [];
+        Object.values(sources).forEach(arr => {
+          arr.forEach(p => { if (!allPlayers.includes(p)) allPlayers.push(p); });
+        });
+        sources[l.key] = allPlayers.length > 0 ? allPlayers : ["FastPlay"];
+      }
+    });
+
     res.json({
       success: true,
       postId: postId,
       nonce: nonceM[1],
-      players,
-      partKey: defaultPartKey,
+      languages,
+      sources,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -519,7 +738,10 @@ app.get("/api/extract-stream", async (req, res) => {
       iframeUrl,
       streamReferer,
       usedPlayer,
-      candidateUrls: (extractedResult && extractedResult.candidateUrls) ? extractedResult.candidateUrls : [manifestUrl],
+      candidateUrls:
+        extractedResult && extractedResult.candidateUrls
+          ? extractedResult.candidateUrls
+          : [manifestUrl],
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -527,7 +749,9 @@ app.get("/api/extract-stream", async (req, res) => {
 });
 
 // Helper to parse media/segment playlist and return analysis JSON
-async function parseMediaPlaylist(contentStr, playlistUrl, res, extraHeaders) {
+// Helper: parse media/segment playlist and return analysis data (no res used).
+// Returns { success, isPlaylist, totalSegments, segments, size, estimatedSize, firstBytesHex, rawBytesBase64, suggestion }
+async function analyzePlaylistData(contentStr, playlistUrl, extraHeaders) {
   const lines = contentStr.split("\n");
   const segments = [];
   const baseUrl = new URL(playlistUrl);
@@ -541,67 +765,82 @@ async function parseMediaPlaylist(contentStr, playlistUrl, res, extraHeaders) {
   }
 
   if (segments.length === 0) {
-    return res.json({
+    return {
       success: true,
       isPlaylist: true,
       totalSegments: 0,
       segments: [],
       error: "M3U8 çalma listesinde segment bulunamadı.",
-    });
+    };
   }
 
-  try {
-    const firstSegUrl = segments[0];
-    const segBuffer = await fetchBuffer(firstSegUrl, extraHeaders);
-    const firstBytesHex = segBuffer
-      .slice(0, 16)
-      .toString("hex")
-      .match(/../g)
-      .join(" ");
+  const firstSegUrl = segments[0];
+  const segBuffer = await fetchBuffer(firstSegUrl, extraHeaders);
+  const firstBytesHex = segBuffer
+    .slice(0, 16)
+    .toString("hex")
+    .match(/../g)
+    .join(" ");
 
-    let suggestion = {
+  let suggestion = {
+    method: "none",
+    confidence: "low",
+    details: "Bilinmeyen format",
+  };
+  const cleanTsOffset = detectTsOffset(segBuffer);
+  if (cleanTsOffset === 0) {
+    suggestion = {
       method: "none",
-      confidence: "low",
-      details: "Bilinmeyen format",
+      confidence: "high",
+      details: "Doğrudan geçerli TS formatı.",
     };
-    const cleanTsOffset = detectTsOffset(segBuffer);
-    if (cleanTsOffset === 0) {
+  } else if (cleanTsOffset > 0) {
+    suggestion = {
+      method: "strip",
+      stripBytes: cleanTsOffset,
+      confidence: "high",
+      details: `İlk ${cleanTsOffset} byte sahte PNG/meta verisi içeriyor, sonrasında TS formatı başlıyor.`,
+    };
+  } else {
+    const xorKey = detectXorKey(segBuffer);
+    if (xorKey !== -1) {
       suggestion = {
-        method: "none",
+        method: "xor",
+        key: `0x${xorKey.toString(16).padStart(2, "0")}`,
         confidence: "high",
-        details: "Doğrudan geçerli TS formatı.",
+        details: `Tek byte XOR şifreleme tespit edildi. Anahtar: 0x${xorKey.toString(16).toUpperCase()}`,
       };
-    } else if (cleanTsOffset > 0) {
-      suggestion = {
-        method: "strip",
-        stripBytes: cleanTsOffset,
-        confidence: "high",
-        details: `İlk ${cleanTsOffset} byte sahte PNG/meta verisi içeriyor, sonrasında TS formatı başlıyor.`,
-      };
-    } else {
-      const xorKey = detectXorKey(segBuffer);
-      if (xorKey !== -1) {
-        suggestion = {
-          method: "xor",
-          key: `0x${xorKey.toString(16).padStart(2, "0")}`,
-          confidence: "high",
-          details: `Tek byte XOR şifreleme tespit edildi. Anahtar: 0x${xorKey.toString(16).toUpperCase()}`,
-        };
-      }
     }
+  }
 
-    res.json({
-      success: true,
-      isPlaylist: true,
-      totalSegments: segments.length,
-      segments,
-      size: segBuffer.length,
-      firstBytesHex,
-      rawBytesBase64: segBuffer.slice(0, 512).toString("base64"),
-      suggestion,
-    });
+  const estimatedSize = await estimateSegmentsSize(
+    segments,
+    extraHeaders,
+    segBuffer.length,
+  );
+
+  return {
+    success: true,
+    isPlaylist: true,
+    totalSegments: segments.length,
+    segments,
+    size: segBuffer.length,
+    estimatedSize,
+    firstBytesHex,
+    rawBytesBase64: segBuffer.slice(0, 512).toString("base64"),
+    suggestion,
+  };
+}
+
+async function parseMediaPlaylist(contentStr, playlistUrl, res, extraHeaders) {
+  try {
+    const data = await analyzePlaylistData(contentStr, playlistUrl, extraHeaders);
+    res.json(data);
   } catch (err) {
-    res.status(500).json({ success: false, error: `Segment analizi hatası: ${err.message}` });
+    res.status(500).json({
+      success: false,
+      error: `Segment analizi hatası: ${err.message}`,
+    });
   }
 }
 
@@ -609,7 +848,7 @@ async function parseMediaPlaylist(contentStr, playlistUrl, res, extraHeaders) {
 
 // Unified Analyze Endpoint: Auto detects if the URL is a playlist or a direct segment
 app.get("/api/analyze", async (req, res) => {
-  const { url, referer } = req.query;
+  const { url, referer, quality } = req.query;
   if (!url) {
     return res.status(400).json({ error: "URL parametresi gerekli." });
   }
@@ -629,19 +868,22 @@ app.get("/api/analyze", async (req, res) => {
         const baseUrl = new URL(url);
         let bestPlaylistUrl = null;
         let maxResolution = 0;
-        
+        let matchedQualityUrl = null;
+
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i].trim();
           if (line.startsWith("#EXT-X-STREAM-INF")) {
             const resMatch = line.match(/RESOLUTION=(\d+)x(\d+)/i);
             let width = 0;
+            let height = 0;
             if (resMatch) {
               width = parseInt(resMatch[1], 10);
+              height = parseInt(resMatch[2], 10);
             }
-            
+
             const bwMatch = line.match(/BANDWIDTH=(\d+)/i);
             let bw = bwMatch ? parseInt(bwMatch[1], 10) : 0;
-            
+
             let nextLineUrl = null;
             for (let j = i + 1; j < lines.length; j++) {
               const nextLine = lines[j].trim();
@@ -650,22 +892,37 @@ app.get("/api/analyze", async (req, res) => {
                 break;
               }
             }
-            
+
             if (nextLineUrl) {
               const score = width > 0 ? width : bw;
+              const currentUrl = new URL(nextLineUrl, baseUrl).toString();
+
+              if (quality && height > 0 && `${height}p` === quality) {
+                matchedQualityUrl = currentUrl;
+              }
+
               if (score > maxResolution || !bestPlaylistUrl) {
                 maxResolution = score;
-                bestPlaylistUrl = new URL(nextLineUrl, baseUrl).toString();
+                bestPlaylistUrl = currentUrl;
               }
             }
           }
         }
-        
-        if (bestPlaylistUrl) {
-          console.log(`Master playlist algılandı. En iyi kalite playlist seçildi: ${bestPlaylistUrl}`);
-          const subBuffer = await fetchBuffer(bestPlaylistUrl, extraHeaders);
+
+        const finalPlaylistUrl = matchedQualityUrl || bestPlaylistUrl;
+
+        if (finalPlaylistUrl) {
+          console.log(
+            `Master playlist algılandı. Seçilen kalite playlist: ${finalPlaylistUrl}`
+          );
+          const subBuffer = await fetchBuffer(finalPlaylistUrl, extraHeaders);
           const subContentStr = subBuffer.toString("utf-8").trim();
-          return parseMediaPlaylist(subContentStr, bestPlaylistUrl, res, extraHeaders);
+          return parseMediaPlaylist(
+            subContentStr,
+            bestPlaylistUrl,
+            res,
+            extraHeaders,
+          );
         }
       }
 
@@ -715,6 +972,11 @@ app.get("/api/analyze", async (req, res) => {
         totalSegments: 1,
         segments: [url],
         size: buffer.length,
+        estimatedSize: {
+          bytes: buffer.length,
+          exact: true,
+          measuredSegments: 1,
+        },
         firstBytesHex,
         rawBytesBase64: buffer.slice(0, 512).toString("base64"),
         suggestion,
@@ -829,6 +1091,7 @@ app.post("/api/download", (req, res) => {
     outputName,
     referer,
     candidateHosts,
+    subtitles,
   } = req.body;
   if (!urls || !Array.isArray(urls) || urls.length === 0) {
     return res.status(400).json({ error: "İndirilecek URL listesi geçersiz." });
@@ -849,30 +1112,85 @@ app.post("/api/download", (req, res) => {
     total: urls.length,
     completed: 0,
     failed: 0,
-    status: "running",
-    logs: [`Görev başlatıldı. Toplam segment: ${urls.length}`],
+    status: "waiting",
+    logs: [`Görev kuyruğa eklendi. Sırasını bekliyor...`],
     outputPath: finalOutputPath,
     outputName: taskOutputName,
+    subtitles: subtitles || [],
   };
 
   tasks.set(taskId, taskState);
   res.json({ success: true, taskId });
 
-  // Run the download process asynchronously
-  runTask(taskId, urls, finalOutputPath, {
-    method,
-    key,
-    iv,
-    stripBytes,
-    concurrency,
-    referer,
-    candidateHosts,
+  // Queue the task
+  taskQueue.push({
+    taskId,
+    urls,
+    outputPath: finalOutputPath,
+    options: {
+      method,
+      key,
+      iv,
+      stripBytes,
+      concurrency,
+      referer,
+      candidateHosts,
+      subtitles,
+    }
   });
+
+  processTaskQueue();
 });
+
+function cleanupTaskFiles(tempDir, tsOutputPath, outputPath, options) {
+  try {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  } catch (_) {}
+  try {
+    if (fs.existsSync(tsOutputPath)) {
+      fs.unlinkSync(tsOutputPath);
+    }
+  } catch (_) {}
+  if (options.subtitles && Array.isArray(options.subtitles)) {
+    const baseName = path.basename(outputPath, path.extname(outputPath));
+    for (const sub of options.subtitles) {
+      try {
+        const subFileName = `${baseName}.${sub.lang || "tr"}.vtt`;
+        const subPath = path.join(path.dirname(outputPath), subFileName);
+        if (fs.existsSync(subPath)) {
+          fs.unlinkSync(subPath);
+        }
+      } catch (_) {}
+    }
+  }
+}
 
 async function runTask(taskId, urls, outputPath, options) {
   const state = tasks.get(taskId);
   const concurrencyLimit = parseInt(options.concurrency || 5, 10);
+
+  // Download subtitles if provided
+  if (options.subtitles && Array.isArray(options.subtitles)) {
+    for (const sub of options.subtitles) {
+      if (sub.src) {
+        try {
+          state.logs.push(`Altyazı indiriliyor: ${sub.label || sub.lang}...`);
+          const subBuf = await fetchBuffer(sub.src, {
+            Referer: "https://www.diziyou.one/",
+          });
+          const baseName = path.basename(outputPath, path.extname(outputPath));
+          const subFileName = `${baseName}.${sub.lang || "tr"}.vtt`;
+          const subPath = path.join(path.dirname(outputPath), subFileName);
+          fs.writeFileSync(subPath, subBuf);
+          state.logs.push(`Altyazı başarıyla kaydedildi: ${subFileName}`);
+        } catch (subErr) {
+          state.logs.push(
+            `Altyazı indirme hatası (${sub.label}): ${subErr.message}`,
+          );
+        }
+      }
+    }
+  }
   const extraHeaders = options.referer ? { Referer: options.referer } : {};
 
   const isMp4 = outputPath.toLowerCase().endsWith(".mp4");
@@ -896,7 +1214,11 @@ async function runTask(taskId, urls, outputPath, options) {
   let activeCandidateHosts = [];
   let effectiveConcurrencyLimit = concurrencyLimit;
 
-  if (options.candidateHosts && options.candidateHosts.length > 0 && urls.length > 0) {
+  if (
+    options.candidateHosts &&
+    options.candidateHosts.length > 0 &&
+    urls.length > 0
+  ) {
     state.logs.push("Ayna sunucular test ediliyor...");
     const testHost = options.candidateHosts[0];
     try {
@@ -905,10 +1227,14 @@ async function runTask(taskId, urls, outputPath, options) {
       const testUrl = parsed.toString();
       // Hızlı test isteği
       await fetchBuffer(testUrl, extraHeaders);
-      state.logs.push("Ayna sunucular aktif, hızlı dağıtık indirme modu devrede.");
+      state.logs.push(
+        "Ayna sunucular aktif, hızlı dağıtık indirme modu devrede.",
+      );
       activeCandidateHosts = options.candidateHosts;
     } catch (_) {
-      state.logs.push("Ayna sunucular bu video için pasif. Orijinal sunucudan indiriliyor...");
+      state.logs.push(
+        "Ayna sunucular bu video için pasif. Orijinal sunucudan indiriliyor...",
+      );
       activeCandidateHosts = [];
       effectiveConcurrencyLimit = Math.min(concurrencyLimit, 4); // Tek sunucuya düşüldüğü için concurrency 4'e çekilir
     }
@@ -933,7 +1259,8 @@ async function runTask(taskId, urls, outputPath, options) {
       if (activeCandidateHosts.length > 0) {
         try {
           const parsed = new URL(item.url);
-          const targetHost = activeCandidateHosts[item.idx % activeCandidateHosts.length];
+          const targetHost =
+            activeCandidateHosts[item.idx % activeCandidateHosts.length];
           parsed.host = targetHost;
           segmentUrl = parsed.toString();
           usingAlternative = true;
@@ -950,7 +1277,10 @@ async function runTask(taskId, urls, outputPath, options) {
         try {
           attempt++;
           // Ayna sunucu 404 verdiğinde veya 2 denemeden fazla hata aldığında orijinal URL'e geri dön
-          const currentUrl = (usingAlternative && (attempt > 2 || lastErrorStatus === 404)) ? item.url : segmentUrl;
+          const currentUrl =
+            usingAlternative && (attempt > 2 || lastErrorStatus === 404)
+              ? item.url
+              : segmentUrl;
           buffer = await fetchBuffer(currentUrl, extraHeaders);
           success = true;
         } catch (err) {
@@ -1000,14 +1330,15 @@ async function runTask(taskId, urls, outputPath, options) {
   await Promise.all(workers);
 
   if (state.status === "cancelled") {
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch (_) {}
-    state.logs.push("Görev iptal edildi.");
+    cleanupTaskFiles(tempDir, tsOutputPath, outputPath, options);
+    state.logs.push("Görev iptal edildi. Geçici dosyalar temizlendi.");
+    scheduleTaskCleanup(taskId);
     return;
   }
 
-  state.logs.push("Segment indirmeleri tamamlandı. Dosyalar birleştiriliyor...");
+  state.logs.push(
+    "Segment indirmeleri tamamlandı. Dosyalar birleştiriliyor...",
+  );
 
   // Open the write stream once to write all downloaded segments
   const writeStream = fs.createWriteStream(tsOutputPath);
@@ -1028,10 +1359,10 @@ async function runTask(taskId, urls, outputPath, options) {
         });
       }
     }
-    
+
     // Close the write stream
     writeStream.end();
-    
+
     // Wait for the write stream to finish flushing to disk
     await new Promise((resolve, reject) => {
       writeStream.on("finish", resolve);
@@ -1054,10 +1385,11 @@ async function runTask(taskId, urls, outputPath, options) {
   } catch (_) {}
 
   if (state.status === "cancelled") {
-    try {
-      fs.unlinkSync(tsOutputPath);
-    } catch (_) {}
-    state.logs.push("Görev birleştirme esnasında iptal edildi.");
+    cleanupTaskFiles(tempDir, tsOutputPath, outputPath, options);
+    state.logs.push(
+      "Görev birleştirme esnasında iptal edildi. Geçici çıktı temizlendi.",
+    );
+    scheduleTaskCleanup(taskId);
     return;
   }
 
@@ -1082,6 +1414,7 @@ async function runTask(taskId, urls, outputPath, options) {
       state.logs.push(
         `MP4 dönüşümü tamamlandı. Video kaydedildi: downloads/${path.basename(outputPath)}`,
       );
+      scheduleTaskCleanup(taskId);
     } catch (err) {
       // FFmpeg bulunamadı veya çökütü — indirme yine de başarılı,
       // sadece MP4'e paketlenemedi. Kullanıcıya TS dosyasını sun.
@@ -1091,12 +1424,14 @@ async function runTask(taskId, urls, outputPath, options) {
       state.logs.push(
         `MP4 dönüşüm hatası: ${err.message} - TS dosyası korundu: downloads/${tsBaseName}`,
       );
+      scheduleTaskCleanup(taskId);
     }
   } else {
     state.status = "completed";
     state.logs.push(
       `İşlem başarıyla tamamlandı. Video kaydedildi: downloads/${path.basename(outputPath)}`,
     );
+    scheduleTaskCleanup(taskId);
   }
 }
 
@@ -1137,11 +1472,12 @@ app.get("/api/series-detail", async (req, res) => {
       Referer: "https://www.diziyou.one/",
     });
     const html = buf.toString("utf-8");
-    
+
     // Find all episodes
     // Structure: <a href="https://www.diziyou.one/breaking-bad-1-sezon-1-bolum/"><div class="bolumust">...
-    const episodeRe = /<a\s+href="(https:\/\/www\.diziyou\.one\/([^"]+?)-([0-9]+)-sezon-([0-9]+)-bolum\/)"[^>]*>\s*<div class="bolumust">[\s\S]*?<div class="baslik">\s*([0-9]+)\.\s*Sezon\s*([0-9]+)\.\s*Bölüm\s*(?:<div[^>]*class="bolumismi"[^>]*>\s*([^<]*?)\s*<\/div>)?/gi;
-    
+    const episodeRe =
+      /<a\s+href="(https:\/\/www\.diziyou\.one\/([^"]+?)-([0-9]+)-sezon-([0-9]+)-bolum\/)"[^>]*>\s*<div class="bolumust">[\s\S]*?<div class="baslik">\s*([0-9]+)\.\s*Sezon\s*([0-9]+)\.\s*Bölüm\s*(?:<div[^>]*class="bolumismi"[^>]*>\s*([^<]*?)\s*<\/div>)?/gi;
+
     const seasonsMap = new Map();
     let m;
     while ((m = episodeRe.exec(html)) !== null) {
@@ -1150,110 +1486,239 @@ app.get("/api/series-detail", async (req, res) => {
       const seasonNum = parseInt(m[3], 10);
       const episodeNum = parseInt(m[4], 10);
       const episodeName = m[7] ? m[7].trim() : "";
-      
+
       if (!seasonsMap.has(seasonNum)) {
         seasonsMap.set(seasonNum, []);
       }
-      
+
       seasonsMap.get(seasonNum).push({
         url: fullUrl,
         season: seasonNum,
         episode: episodeNum,
         name: episodeName || `${episodeNum}. Bölüm`,
-        title: `${seasonNum}. Sezon ${episodeNum}. Bölüm ${episodeName ? `(${episodeName})` : ""}`
+        title: `${seasonNum}. Sezon ${episodeNum}. Bölüm ${episodeName ? `(${episodeName})` : ""}`,
       });
     }
-    
+
     // Sort seasons and episodes
     const seasons = [];
-    const sortedSeasonKeys = Array.from(seasonsMap.keys()).sort((a, b) => a - b);
+    const sortedSeasonKeys = Array.from(seasonsMap.keys()).sort(
+      (a, b) => a - b,
+    );
     for (const sKey of sortedSeasonKeys) {
       const eps = seasonsMap.get(sKey).sort((a, b) => a.episode - b.episode);
       seasons.push({
         season: sKey,
-        episodes: eps
+        episodes: eps,
       });
     }
-    
+
     res.json({ success: true, seasons });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
+const diziyouVariantDefinitions = [
+  { id: "turkceAltyazili", name: "Türkçe Altyazılı", suffix: "" },
+  { id: "turkceDublaj", name: "Türkçe Dublaj", suffix: "_tr" },
+  { id: "ingilizceAltyazili", name: "İngilizce Altyazılı", suffix: "_enSub" },
+];
+
+function getDiziyouVariantsFromHtml(html) {
+  const availableVariants = diziyouVariantDefinitions.filter((variant) =>
+    new RegExp(`id=["']${variant.id}["']`, "i").test(html),
+  );
+
+  return availableVariants.length > 0
+    ? availableVariants
+    : diziyouVariantDefinitions;
+}
+
+function buildDiziyouVariantUrl(playerUrl, suffix) {
+  const parsed = new URL(playerUrl.replace(/&amp;/g, "&"));
+  parsed.pathname = parsed.pathname.replace(
+    /(?:_tr|_enSub)?\.html$/i,
+    `${suffix}.html`,
+  );
+  parsed.search = "";
+  return parsed.toString();
+}
+
+function getHtmlAttr(tag, attrName) {
+  const match = tag.match(new RegExp(`${attrName}=["']([^"']+)["']`, "i"));
+  return match ? match[1] : "";
+}
+
 // 2) Extract m3u8 stream and subtitle links from episode URL
 app.get("/api/extract-series-video", async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: "Bölüm URL'si gerekli." });
+
+  const logFile = path.join(process.cwd(), "server_debug.log");
+  const log = (msg) => {
+    const time = new Date().toISOString();
+    fs.appendFileSync(logFile, `[${time}] ${msg}\n`);
+    console.log(msg);
+  };
+
+  log(`Extracting: ${url}`);
   try {
     const buf = await fetchBuffer(url, {
       Referer: "https://www.diziyou.one/",
     });
     const html = buf.toString("utf-8");
-    
+
     // Find diziyouPlayer iframe
-    // <iframe id="diziyouPlayer" src="https://www.diziyou.one/player/10551.html?next=..."
-    const iframeM = html.match(/<iframe[^>]*id="diziyouPlayer"[^>]*src="([^"]+)"/) || html.match(/id="diziyouPlayer"\s+src="([^"]+)"/);
+    const iframeM =
+      html.match(/<iframe[^>]*id="diziyouPlayer"[^>]*src="([^"]+)"/) ||
+      html.match(/id="diziyouPlayer"\s+src="([^"]+)"/);
     if (!iframeM) {
-      return res.status(422).json({ success: false, error: "Oynatıcı iframe'i bulunamadı." });
+      log(
+        `Error: diziyouPlayer iframe not found in HTML. HTML length: ${html.length}`,
+      );
+      return res
+        .status(422)
+        .json({ success: false, error: "Oynatıcı iframe'i bulunamadı." });
     }
-    
+
     const playerUrlStr = iframeM[1];
-    const playerUrlParsed = new URL(playerUrlStr);
-    const basePath = playerUrlParsed.origin + playerUrlParsed.pathname; // https://www.diziyou.one/player/10551.html
-    
+    log(`Found player URL: ${playerUrlStr}`);
     const streams = [];
-    const variants = [
-      { name: "Türkçe Altyazılı", suffix: "" },
-      { name: "Türkçe Dublaj", suffix: "_tr" },
-      { name: "İngilizce Altyazılı", suffix: "_enSub" }
-    ];
-    
+    const variants = getDiziyouVariantsFromHtml(html);
+    log(
+      `Available variants on page: ${variants.map((v) => v.name).join(", ")}`,
+    );
+
     for (const variant of variants) {
-      let variantUrl;
-      if (variant.suffix === "") {
-        variantUrl = basePath;
-      } else {
-        variantUrl = basePath.replace(".html", `${variant.suffix}.html`);
-      }
-      
+      const variantUrl = buildDiziyouVariantUrl(playerUrlStr, variant.suffix);
+
       try {
+        log(`Fetching variant: ${variant.name} -> ${variantUrl}`);
         const pBuf = await fetchBuffer(variantUrl, {
           Referer: url,
         });
         const pHtml = pBuf.toString("utf-8");
-        const m3u8M = pHtml.match(/<source[^>]*src="([^"]*\.m3u8[^"]*)"/) || pHtml.match(/id="diziyouSource"\s+src="([^"]+)"/);
-        
+        const m3u8M =
+          pHtml.match(/<source\b[^>]*\bsrc=["']([^"']*\.m3u8[^"']*)["']/i) ||
+          pHtml.match(/id=["']diziyouSource["'][^>]*\bsrc=["']([^"']+)["']/i) ||
+          pHtml.match(/file:\s*["']([^"']*\.m3u8[^"']*)["']/i);
+
         // Find subtitles
         const subtitles = [];
-        const subtitleRe = /<track[^>]*src="([^"]*\.vtt[^"]*)"[^>]*srclang="([^"]*)"[^>]*label="([^"]*)"/gi;
+        const subtitleRe = /<track\b[^>]*>/gi;
         let subM;
         while ((subM = subtitleRe.exec(pHtml)) !== null) {
+          const trackTag = subM[0];
+          const src = getHtmlAttr(trackTag, "src");
+          if (!src || !src.includes(".vtt")) continue;
           subtitles.push({
-            src: subM[1],
-            lang: subM[2],
-            label: subM[3]
+            src: new URL(src, variantUrl).toString(),
+            lang: getHtmlAttr(trackTag, "srclang"),
+            label: getHtmlAttr(trackTag, "label"),
           });
         }
-        
+        log(`Found ${subtitles.length} subtitles for ${variant.name}`);
+
         if (m3u8M) {
+          const rawM3u8Url = new URL(m3u8M[1], variantUrl).toString();
+          log(`Found m3u8 for ${variant.name}: ${rawM3u8Url}`);
+          const qualities = [];
+
+          try {
+            // Fetch the main m3u8 to extract resolution list
+            const m3u8Buf = await fetchBuffer(rawM3u8Url, {
+              Referer: variantUrl,
+            });
+            const m3u8Content = m3u8Buf.toString("utf-8").trim();
+
+            if (m3u8Content.includes("#EXT-X-STREAM-INF")) {
+              const mLines = m3u8Content.split("\n");
+              const mBaseUrl = new URL(rawM3u8Url);
+
+              for (let i = 0; i < mLines.length; i++) {
+                const line = mLines[i].trim();
+                if (line.startsWith("#EXT-X-STREAM-INF")) {
+                  // Extract resolution (e.g. 1920x1080 -> 1080p)
+                  const resMatch = line.match(/RESOLUTION=(\d+)x(\d+)/i);
+                  let resName = "Bilinmeyen";
+                  if (resMatch) {
+                    resName = `${resMatch[2]}p`; // e.g. "1080p"
+                  } else {
+                    const bwMatch = line.match(/BANDWIDTH=(\d+)/i);
+                    if (bwMatch) {
+                      resName = `${Math.round(parseInt(bwMatch[1], 10) / 1000)}kbps`;
+                    }
+                  }
+
+                  // Next non-empty line is url
+                  let qUrl = null;
+                  for (let j = i + 1; j < mLines.length; j++) {
+                    const nextLine = mLines[j].trim();
+                    if (nextLine && !nextLine.startsWith("#")) {
+                      qUrl = new URL(nextLine, mBaseUrl).toString();
+                      break;
+                    }
+                  }
+
+                  if (qUrl) {
+                    let targetUrl = qUrl;
+                    if (resName !== "Bilinmeyen" && !qUrl.includes(`/${resName}.m3u8`)) {
+                      const testUrl = qUrl.replace(/\/\d+p\.m3u8/i, `/${resName}.m3u8`);
+                      try {
+                        const checkRes = await fetch(testUrl, { method: "HEAD", headers: { Referer: variantUrl } });
+                        if (checkRes.status === 200) {
+                          targetUrl = testUrl;
+                        }
+                      } catch (_) {}
+                    }
+                    qualities.push({
+                      resolution: resName,
+                      m3u8Url: targetUrl,
+                    });
+                  }
+                }
+              }
+            }
+          } catch (m3u8Err) {
+            console.log(
+              `Çözünürlük listesi çekilemedi, varsayılan kullanılacak: ${m3u8Err.message}`,
+            );
+          }
+
+          // Fallback to rawUrl if no qualities extracted
+          if (qualities.length === 0) {
+            qualities.push({
+              resolution: "En Yüksek (Oto)",
+              m3u8Url: rawM3u8Url,
+            });
+          }
+
           streams.push({
             name: variant.name,
-            m3u8Url: m3u8M[1],
-            subtitles: subtitles
+            qualities,
+            subtitles: subtitles,
           });
+        } else {
+          log(`No m3u8 found for ${variant.name}`);
         }
       } catch (e) {
-        console.log(`Diziyou player opsiyonu yüklenemedi (${variant.name}): ${e.message}`);
+        log(`Failed to fetch/parse variant ${variant.name}: ${e.message}`);
       }
     }
-    
+
+    log(`Extraction complete. Total streams found: ${streams.length}`);
     if (streams.length === 0) {
-      return res.status(422).json({ success: false, error: "Oynatıcıda geçerli yayın kaynağı bulunamadı." });
+      log(`Error: No streams found at all!`);
+      return res.status(422).json({
+        success: false,
+        error: "Oynatıcıda geçerli yayın kaynağı bulunamadı.",
+      });
     }
-    
+
     res.json({ success: true, streams });
   } catch (err) {
+    log(`Fatal extraction error: ${err.message}`);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -1276,7 +1741,106 @@ app.post("/api/task-cancel/:taskId", (req, res) => {
     return res.status(404).json({ error: "Görev bulunamadı." });
   }
   task.status = "cancelled";
+  scheduleTaskCleanup(taskId);
   res.json({ success: true });
+});
+
+// 1) List downloaded files (.mp4 and .ts)
+app.get("/api/downloads-list", (req, res) => {
+  const downloadsDir = path.join(process.cwd(), "downloads");
+  if (!fs.existsSync(downloadsDir)) {
+    return res.json({ success: true, files: [] });
+  }
+
+  try {
+    const files = fs.readdirSync(downloadsDir);
+    const videoFiles = [];
+
+    for (const file of files) {
+      const ext = path.extname(file).toLowerCase();
+      if (ext === ".mp4" || ext === ".ts") {
+        const filePath = path.join(downloadsDir, file);
+        const stats = fs.statSync(filePath);
+        // exclude temp directories or active chunk files
+        if (stats.isFile()) {
+          videoFiles.push({
+            name: file,
+            size: stats.size,
+            createdAt: stats.birthtime,
+            path: `/downloads/${file}`
+          });
+        }
+      }
+    }
+
+    // Sort by creation date descending
+    videoFiles.sort((a, b) => b.createdAt - a.createdAt);
+
+    res.json({ success: true, files: videoFiles });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2) Stream TS files on-the-fly converting to MP4 format using FFmpeg
+app.get("/api/stream-ts", (req, res) => {
+  const { file } = req.query;
+  if (!file) {
+    return res.status(400).send("Dosya belirtilmedi.");
+  }
+
+  const downloadsDir = path.join(process.cwd(), "downloads");
+  const filePath = path.join(downloadsDir, file);
+
+  // Safety check to prevent directory traversal
+  const relative = path.relative(downloadsDir, filePath);
+  const isSafe = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+  if (!isSafe || !fs.existsSync(filePath)) {
+    return res.status(404).send("Dosya bulunamadı veya geçersiz yol.");
+  }
+
+  // Set HTTP headers for MP4 streaming
+  res.writeHead(200, {
+    "Content-Type": "video/mp4",
+    "Accept-Ranges": "bytes",
+    "Transfer-Encoding": "chunked"
+  });
+
+  // Spawn ffmpeg to copy ts container into mp4 dynamically
+  // -movflags frag_keyframe+empty_moov ensures fragmenting so it can stream without writing full headers at start
+  const ffmpeg = spawn("ffmpeg", [
+    "-y",
+    "-i", filePath,
+    "-c", "copy",
+    "-f", "mp4",
+    "-movflags", "frag_keyframe+empty_moov+faststart",
+    "pipe:1"
+  ]);
+
+  ffmpeg.stdout.pipe(res);
+
+  // Log ffmpeg errors
+  ffmpeg.stderr.on("data", (data) => {
+    // console.log(`[FFmpeg Stream] ${data.toString()}`);
+  });
+
+  // Clean up spawn on connection close or finish
+  req.on("close", () => {
+    ffmpeg.kill("SIGKILL");
+  });
+
+  ffmpeg.on("close", (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(`[FFmpeg Stream] Process exited with code ${code}`);
+    }
+  });
+
+  ffmpeg.on("error", (err) => {
+    console.error("[FFmpeg Stream] Error spawning FFmpeg:", err);
+    if (!res.headersSent) {
+      res.status(500).send(`FFmpeg stream hatası: ${err.message}. Lütfen FFmpeg yüklü olduğundan emin olun.`);
+    }
+  });
 });
 
 // Serve downloaded files
@@ -1286,17 +1850,21 @@ app.use("/downloads", express.static(path.join(process.cwd(), "downloads")));
 export { app };
 export function startServer(port = 3000) {
   return new Promise((resolve, reject) => {
-    const server = app.listen(port, () => {
-      console.log(`Server running at http://localhost:${port}`);
-      resolve(server);
-    }).on("error", (err) => {
-      reject(err);
-    });
+    const server = app
+      .listen(port, () => {
+        console.log(`Server running at http://localhost:${port}`);
+        resolve(server);
+      })
+      .on("error", (err) => {
+        reject(err);
+      });
   });
 }
 
 // If run directly via node, start server immediately
-const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+const isDirectRun =
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isDirectRun) {
   startServer(PORT).catch((err) => {
     console.error("Server start error:", err);

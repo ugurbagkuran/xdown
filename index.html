@@ -14,36 +14,38 @@
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
         />
-        <link rel="stylesheet" href="style.css" />
+        <link rel="stylesheet" href="style.css?v=2.0" />
     </head>
     <body>
         <div class="app-container">
-            <header class="app-header">
+            <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; position: relative;">
                 <div class="logo">
                     <i class="fa-solid fa-terminal logo-icon"></i>
                     <h1>filmdownloader.</h1>
                 </div>
-                <p class="subtitle">
-                    png_ts_decryption_utility.exe
-                </p>
+                <div class="download-manager-wrapper" style="position: relative; z-index: 1001;">
+                    <button id="btn-download-manager">
+                        <svg class="download-manager-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                        <span id="download-count-badge" class="download-badge hidden">0</span>
+                    </button>
+                    <!-- Download Manager Popover Dropdown -->
+                    <div id="download-manager-panel" class="download-manager-panel hidden glass">
+                        <div class="dm-header">
+                            <span>aktif_indirmeler.</span>
+                            <button id="btn-clear-dm" class="btn btn-danger btn-small" style="font-size: 10px; padding: 2px 6px;">temizle.</button>
+                        </div>
+                        <div id="dm-tasks-list" class="dm-tasks-list">
+                            <div class="dm-empty">aktif indirme yok.</div>
+                        </div>
+                    </div>
+                </div>
             </header>
 
             <main class="app-content">
-                <!-- Sekme Çubuğu -->
-                <div class="tabs-bar" style="grid-column: 1/-1">
-                    <button class="tab-btn active" data-tab="tab-search">
-                        <i class="fa-solid fa-search"></i> film_ara.
-                    </button>
-                    <button class="tab-btn" data-tab="tab-manual">
-                        <i class="fa-solid fa-sliders"></i> manuel_islem.
-                    </button>
-                </div>
-
-                <!-- ══════════ SEKME 1: FİLM ARA ══════════ -->
+                <!-- ══════════ FİLM ARA PANELİ ══════════ -->
                 <div
                     id="tab-search"
                     class="tab-panel active"
-                    style="grid-column: 1/-1"
                 >
                     <div class="card glass" style="margin-bottom: 20px">
                         <div class="card-header">
@@ -87,302 +89,26 @@
                         </div>
                     </div>
 
-                    <!-- Otomatik indirme kuyruğu: her film kendi kartında, aynı anda birden fazla film indirilebilir -->
-                    <div id="download-queue"></div>
+                    <!-- Otomatik indirme kuyruğu: Gizli tutuluyor, JS referansları için -->
+                    <div id="download-queue" class="hidden"></div>
                 </div>
 
-                <!-- ══════════ SEKME 2: MANUEL İNDİRME ══════════ -->
-                <div id="tab-manual" class="tab-panel">
-                    <section class="panel-left">
-                        <!-- Kart 1: Kaynak URL Girişi -->
-                        <div class="card glass">
-                            <div class="card-header">
-                                <i class="fa-solid fa-link"></i>
-                                <h2>akis_kaynagi_verisi.</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="input-group">
-                                    <label for="stream-url"
-                                        >M3U8 veya PNG Segment URL'si</label
-                                    >
-                                    <div class="input-with-btn">
-                                        <input
-                                            type="text"
-                                            id="stream-url"
-                                            placeholder="https://example.com/playlist.m3u8 veya segment.png"
-                                            required
-                                        />
-                                        <button
-                                            id="btn-analyze"
-                                            class="btn btn-secondary"
-                                        >
-                                            <i
-                                                class="fa-solid fa-magnifying-glass"
-                                            ></i>
-                                            analiz_et.
-                                        </button>
-                                    </div>
+                <!-- ══════════ İNDİRİLENLER PANELİ ══════════ -->
+                <div id="tab-downloads" class="tab-panel active">
+                    <div class="card glass" style="margin-bottom: 20px; display: flex; flex-direction: column;">
+                        <div class="card-header">
+                            <i class="fa-solid fa-folder-open"></i>
+                            <h2>indirilen_videolar.</h2>
+                        </div>
+                        <div class="card-body" style="flex-grow: 1; display: flex; flex-direction: column; max-height: 480px; overflow-y: auto;">
+                            <div id="downloads-list" class="downloads-list">
+                                <div class="downloads-empty">
+                                    <i class="fa-solid fa-folder-minus" style="font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.3;"></i>
+                                    indirilen video bulunamadı.
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Kart 2: Deşifre Ayarları -->
-                        <div class="card glass">
-                            <div class="card-header">
-                                <i class="fa-solid fa-sliders"></i>
-                                <h2>desifre_ayarlari.</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="input-group">
-                                    <label for="decrypt-method"
-                                        >Deşifre Metodu</label
-                                    >
-                                    <select id="decrypt-method">
-                                        <option value="none">
-                                            Deşifre Etme (Doğrudan Birleştir)
-                                        </option>
-                                        <option value="auto">
-                                            Otomatik Algıla (Önerilen)
-                                        </option>
-                                        <option value="xor">
-                                            XOR Maskesi Çözümü
-                                        </option>
-                                        <option value="strip">
-                                            Header Stripping (Byte Kesme)
-                                        </option>
-                                        <option value="aes-128">
-                                            AES-128-CBC Decryption
-                                        </option>
-                                    </select>
-                                </div>
-
-                                <div id="method-options">
-                                    <div class="input-group val-key hidden">
-                                        <label for="decrypt-key"
-                                            >Anahtar (Key)
-                                            <span class="help-text"
-                                                >(Hex: 0x55 veya 55aa, Sayı: 85,
-                                                Metin: abc)</span
-                                            ></label
-                                        >
-                                        <input
-                                            type="text"
-                                            id="decrypt-key"
-                                            placeholder="Örn: 0x55"
-                                        />
-                                    </div>
-                                    <div class="input-group val-iv hidden">
-                                        <label for="decrypt-iv"
-                                            >AES IV (Hex 16 byte -
-                                            opsiyonel)</label
-                                        >
-                                        <input
-                                            type="text"
-                                            id="decrypt-iv"
-                                            placeholder="Örn: 00000000000000000000000000000000"
-                                        />
-                                    </div>
-                                    <div class="input-group val-strip hidden">
-                                        <label for="strip-bytes"
-                                            >Kesilecek Byte Sayısı (Header
-                                            Size)</label
-                                        >
-                                        <input
-                                            type="number"
-                                            id="strip-bytes"
-                                            min="0"
-                                            placeholder="Örn: 8"
-                                            value="0"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div class="input-row">
-                                    <div class="input-group">
-                                        <label for="concurrency"
-                                            >Eşzamanlı Bağlantı</label
-                                        >
-                                        <div class="range-container">
-                                            <input
-                                                type="range"
-                                                id="concurrency"
-                                                min="1"
-                                                max="32"
-                                                value="16"
-                                            />
-                                            <span id="concurrency-val">16</span>
-                                        </div>
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="output-format"
-                                            >Çıktı Formatı</label
-                                        >
-                                        <select id="output-format">
-                                            <option value="ts">
-                                                TS (MPEG-TS) — Hızlı
-                                            </option>
-                                            <option value="mp4">
-                                                MP4 — FFmpeg gerekir
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div class="input-group">
-                                        <label for="output-name"
-                                            >Çıktı Dosya Adı</label
-                                        >
-                                        <input
-                                            type="text"
-                                            id="output-name"
-                                            value="downloaded_video.ts"
-                                            placeholder="video.ts"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div class="input-group">
-                                    <label for="custom-referer"
-                                        >Custom Referer (İsteğe Bağlı)</label
-                                    >
-                                    <input
-                                        type="text"
-                                        id="custom-referer"
-                                        placeholder="Örn: https://fastplay.mom/"
-                                    />
-                                </div>
-
-                                <button
-                                    id="btn-start"
-                                    class="btn btn-primary btn-block"
-                                    disabled
-                                >
-                                    <i class="fa-solid fa-cloud-arrow-down"></i>
-                                    islemi_baslat.
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="panel-right">
-                        <!-- Kart 3: Otomatik Analiz Sonuçları -->
-                        <div id="analysis-panel" class="card glass hidden">
-                            <div class="card-header">
-                                <i class="fa-solid fa-chart-simple"></i>
-                                <h2>akis_analiz_raporu.</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="analysis-summary">
-                                    <div class="analysis-info">
-                                        <span class="info-label"
-                                            >Parça Boyutu:</span
-                                        >
-                                        <span id="info-size" class="info-val"
-                                            >-</span
-                                        >
-                                    </div>
-                                    <div class="analysis-info">
-                                        <span class="info-label"
-                                            >İlk 16 Byte (Hex):</span
-                                        >
-                                        <span
-                                            id="info-hex"
-                                            class="info-val font-code"
-                                            >-</span
-                                        >
-                                    </div>
-                                    <div
-                                        id="suggestion-alert"
-                                        class="alert alert-info"
-                                    >
-                                        <strong>Öneri:</strong>
-                                        <span id="suggestion-text"
-                                            >Analiz bekleniyor...</span
-                                        >
-                                        <button
-                                            id="btn-apply-suggestion"
-                                            class="btn btn-small btn-secondary hidden"
-                                        >
-                                            Uygula
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="hex-viewer-title">
-                                    Örnek Segment İlk Byte Görünümü (Şifreli):
-                                </div>
-                                <div class="hex-grid-container">
-                                    <div
-                                        id="hex-viewer-grid"
-                                        class="hex-grid font-code"
-                                    ></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Kart 4: Canlı İlerleme -->
-                        <div id="progress-panel" class="card glass hidden">
-                            <div class="card-header">
-                                <i class="fa-solid fa-rotate"></i>
-                                <h2>ilerleme_durumu.</h2>
-                                <button
-                                    id="btn-cancel"
-                                    class="btn btn-danger btn-small"
-                                >
-                                    <i class="fa-solid fa-xmark"></i> iptal_et.
-                                </button>
-                            </div>
-                            <div class="card-body">
-                                <div class="progress-details">
-                                    <div class="progress-info-row">
-                                        <span>Tamamlanan Segmentler:</span>
-                                        <strong id="progress-count"
-                                            >0 / 0</strong
-                                        >
-                                    </div>
-                                    <div class="progress-info-row">
-                                        <span>Durum:</span>
-                                        <span
-                                            id="progress-status"
-                                            class="status-badge status-running"
-                                            >İndiriliyor...</span
-                                        >
-                                    </div>
-                                </div>
-                                <div class="progress-bar-bg">
-                                    <div
-                                        id="progress-bar-fill"
-                                        class="progress-bar-fill"
-                                        style="width: 0%"
-                                    ></div>
-                                </div>
-                                <div class="log-title">
-                                    İşlem Günlükleri (Live Logs):
-                                </div>
-                                <div
-                                    id="log-terminal"
-                                    class="log-terminal font-code"
-                                ></div>
-                                <div
-                                    id="download-link-container"
-                                    class="download-link-container hidden"
-                                >
-                                    <div class="alert alert-success">
-                                        <i class="fa-solid fa-circle-check"></i>
-                                        Video başarıyla oluşturuldu!
-                                    </div>
-                                    <a
-                                        id="btn-download-file"
-                                        href="#"
-                                        download
-                                        class="btn btn-success btn-block"
-                                    >
-                                        <i
-                                            class="fa-solid fa-file-arrow-down"
-                                        ></i>
-                                        Videoyu Bilgisayara İndir
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
+                    </div>
                 </div>
             </main>
         </div>
@@ -403,8 +129,116 @@
                     <div id="modal-seasons-bar" class="seasons-bar">
                         <!-- Sezon Butonları dinamik eklenecek -->
                     </div>
+                    
+                    <div id="bulk-download-panel" class="bulk-download-panel hidden">
+                        <div class="bulk-title">
+                            <svg class="download-svg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" style="display:inline-block; vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> sezonu_toplu_indir.
+                        </div>
+                        <div class="bulk-controls">
+                            <div class="control-group">
+                                <label for="bulk-lang">yayın türü:</label>
+                                <select id="bulk-lang" style="padding: 0.4rem 1.6rem 0.4rem 0.8rem;">
+                                    <!-- Dinamik olarak dolacak -->
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="bulk-quality">kalite:</label>
+                                <select id="bulk-quality" style="padding: 0.4rem 1.6rem 0.4rem 0.8rem;">
+                                    <!-- Dinamik olarak dolacak -->
+                                </select>
+                            </div>
+                            <button id="btn-bulk-download" class="btn btn-primary btn-small">
+                                <svg class="download-svg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" style="display:inline-block; vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> sezonu_indir.
+                            </button>
+                        </div>
+                    </div>
+
                     <div id="modal-episodes-list" class="episodes-list">
                         <!-- Bölümler buraya dinamik eklenecek -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Confirm Modal Overlay -->
+        <div id="custom-confirm-modal" class="modal-overlay hidden" style="z-index: 2000;">
+            <div class="modal-content" style="max-width: 450px; padding: 20px; text-transform: lowercase; gap: 16px; border: 2px solid var(--primary); background: var(--bg-card); position: relative;">
+                <div class="modal-header" style="border-bottom: 1px solid var(--outline); padding-bottom: 10px;">
+                    <h2 style="font-family:'Space Grotesk', sans-serif; font-size: 1.15rem; color: var(--primary); margin:0;"><i class="fa-solid fa-triangle-exclamation"></i> sistem_onayi.</h2>
+                </div>
+                <div class="modal-body" style="font-size: 0.9rem; color: var(--text-main); line-height: 1.4; padding: 5px 0;">
+                    <p id="custom-confirm-text" style="margin: 0;"></p>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--outline); padding-top: 12px;">
+                    <button id="btn-confirm-yes" class="btn btn-primary btn-small">tamam.</button>
+                    <button id="btn-confirm-no" class="btn btn-danger btn-small">iptal.</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Player Modal Overlay -->
+        <div id="video-player-modal" class="modal-overlay hidden" style="z-index: 2100;">
+            <div class="video-player-content glass" style="max-width: 960px; width: 90%; background: var(--bg-card); border: 2px solid var(--primary); padding: 0; display: flex; flex-direction: column; position: relative;">
+                <div class="modal-header" style="padding: 12px 20px; border-bottom: 1px solid var(--outline); display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; white-space: nowrap;">
+                        <i class="fa-solid fa-circle-play" style="color: var(--primary); font-size: 1.2rem;"></i>
+                        <h2 id="video-player-title" style="font-size: 1rem; margin: 0; text-transform: lowercase; text-overflow: ellipsis; overflow: hidden;">video_oynatici.</h2>
+                    </div>
+                    <button id="btn-close-video" class="btn btn-danger btn-small">
+                        <i class="fa-solid fa-xmark"></i> kapat.
+                    </button>
+                </div>
+                <div class="video-player-body" style="background: #000; position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16/9; overflow: hidden;">
+                    <video id="main-video-element" style="width: 100%; height: 100%; object-fit: contain;"></video>
+                    
+                    <!-- Custom Controls Overlay -->
+                    <div class="video-controls-overlay" id="video-controls-overlay">
+                        <!-- Timeline Slider -->
+                        <div class="video-timeline-wrapper" id="video-timeline-wrapper">
+                            <div class="video-timeline-bg" id="video-timeline-bg">
+                                <div class="video-timeline-fill" id="video-timeline-fill"></div>
+                                <div class="video-timeline-handle" id="video-timeline-handle"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-controls-row">
+                            <!-- Left Controls: Play, Back, Forward, Volume -->
+                            <div class="controls-left">
+                                <button id="btn-video-play" class="control-btn" title="Oynat/Duraklat (Space)">
+                                    <i class="fa-solid fa-play"></i>
+                                </button>
+                                <button id="btn-video-rewind" class="control-btn" title="10 Saniye Geri (Sol Yön Tuşu)">
+                                    <i class="fa-solid fa-backward"></i>
+                                </button>
+                                <button id="btn-video-forward" class="control-btn" title="10 Saniye İleri (Sağ Yön Tuşu)">
+                                    <i class="fa-solid fa-forward"></i>
+                                </button>
+                                
+                                <div class="video-volume-wrapper">
+                                    <button id="btn-video-mute" class="control-btn" title="Sessiz">
+                                        <i class="fa-solid fa-volume-high"></i>
+                                    </button>
+                                    <input type="range" id="video-volume-slider" min="0" max="1" step="0.05" value="1">
+                                </div>
+                            </div>
+                            
+                            <!-- Center: Time Display -->
+                            <div class="controls-center font-code">
+                                <span id="video-current-time">00:00:00</span>
+                                <span class="separator" style="color: var(--text-muted); margin: 0 4px;">/</span>
+                                <span id="video-duration">00:00:00</span>
+                            </div>
+                            
+                            <!-- Right Controls: Picture-in-Picture, Fullscreen -->
+                            <div class="controls-right">
+                                <button id="btn-video-pip" class="control-btn" title="Picture in Picture">
+                                    <i class="fa-solid fa-window-restore"></i>
+                                </button>
+                                <button id="btn-video-fullscreen" class="control-btn" title="Tam Ekran (F)">
+                                    <i class="fa-solid fa-expand"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -414,6 +248,6 @@
             <p>filmdownloader_v1.0.0 // system_active.</p>
         </footer>
 
-        <script src="app.js" type="module"></script>
+        <script src="app.js?v=2.0" type="module"></script>
     </body>
 </html>
