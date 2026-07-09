@@ -1966,6 +1966,40 @@ const elLibraryTotalCount = document.getElementById("library-total-count");
 // Global cache for downloaded files
 let libraryFiles = [];
 
+// Seri bazlı izleme ilerlemesi (localStorage) ve bölüm seçici için indeks
+const librarySeriesIndex = new Map(); // seriesKey -> [{ name, season, episode }]
+
+function seriesProgressKey(seriesKey) {
+  return `series_progress_${seriesKey}`;
+}
+
+function getSeriesProgress(seriesKey) {
+  try {
+    return JSON.parse(localStorage.getItem(seriesProgressKey(seriesKey)) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function setSeriesProgress(seriesKey, season, episode) {
+  try {
+    localStorage.setItem(seriesProgressKey(seriesKey), JSON.stringify({ season, episode }));
+  } catch {}
+}
+
+// İstemci tarafı SxxExx ayrıştırıcı (openVideoPlayer'da ilerleme için)
+function parseSeriesMetaClient(fileName) {
+  const base = String(fileName).replace(/\.[^/.]+$/, "");
+  const m = base.match(/^(.*?)[_\s-]+S(\d{1,2})E(\d{1,2})(?:[_\s-]|$)/i);
+  if (!m) return null;
+  return {
+    key: m[1].replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase(),
+    title: m[1].replace(/_/g, " ").replace(/\s+/g, " ").trim(),
+    season: Number.parseInt(m[2], 10),
+    episode: Number.parseInt(m[3], 10),
+  };
+}
+
 // Fetch and Render Downloaded Videos
 async function fetchDownloadsList() {
   try {
@@ -2093,10 +2127,46 @@ function renderLibraryGrid(files) {
 
     htmlContent += `<div class="library-group col-span-full flex flex-col gap-3">`;
     if (group.isSeries) {
+      const seriesKey = group.items[0].seriesMeta.key;
+      const episodes = group.items
+        .filter((x) => x.seriesMeta)
+        .map((x) => ({
+          name: x.file.name,
+          season: x.seriesMeta.season,
+          episode: x.seriesMeta.episode,
+        }));
+      librarySeriesIndex.set(seriesKey, episodes);
+
+      // "Kaldığın yerden devam et" hedefi: izlenen bölüm varsa o, yoksa son bölüm
+      let continueFile = "";
+      const prog = getSeriesProgress(seriesKey);
+      if (prog) {
+        const hit = episodes.find(
+          (e) => e.season === prog.season && e.episode === prog.episode,
+        );
+        if (hit) continueFile = hit.name;
+      }
+      if (!continueFile && episodes.length > 0) {
+        const last = episodes.reduce((a, b) =>
+          b.season > a.season || (b.season === a.season && b.episode > a.episode)
+            ? b
+            : a,
+        );
+        continueFile = last.name;
+      }
+
       htmlContent += `
-        <div class="flex items-center justify-between border-b border-outline/40 pb-2">
+        <div class="library-group-header">
           <h3 class="font-mono text-xs text-primary-container tracking-wide">${escapeHtml(group.title)}</h3>
-          <span class="font-mono text-[10px] text-on-surface-variant">${group.items.length} bölüm</span>
+          <div class="library-group-actions">
+            ${
+              continueFile
+                ? `<button class="btn-continue" data-continue="${encodeURIComponent(continueFile)}"><span class="material-symbols-outlined" style="font-size:14px;">play_arrow</span> kaldığın yerden devam et</button>`
+                : ""
+            }
+            <button class="btn-episode-pick" data-series-index="${escapeHtml(seriesKey)}"><span class="material-symbols-outlined" style="font-size:14px;">playlist_play</span> bölümleri seç</button>
+            <span class="font-mono text-[10px] text-on-surface-variant">${group.items.length} bölüm</span>
+          </div>
         </div>
       `;
     }
@@ -2176,6 +2246,76 @@ function renderLibraryGrid(files) {
         activeTask.status = "cancelled";
         renderLibraryGrid(libraryFiles);
       }
+    });
+  });
+
+  // "Kaldığın yerden devam et" → ilgili bölümü oynat
+  elLibraryGrid.querySelectorAll(".btn-continue").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const fileName = decodeURIComponent(btn.dataset.continue);
+      if (fileName) openVideoPlayer(fileName);
+    });
+  });
+
+  // "Bölümleri seç" → bölüm seçme panelini aç
+  elLibraryGrid.querySelectorAll(".btn-episode-pick").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openEpisodePicker(btn.dataset.seriesIndex);
+    });
+  });
+}
+
+// Bölüm seçme paneli: seriye ait indirilmiş bölümleri listeler, seçilen oynatılır
+function openEpisodePicker(seriesKey) {
+  const episodes = librarySeriesIndex.get(seriesKey);
+  if (!episodes || episodes.length === 0) return;
+
+  const prog = getSeriesProgress(seriesKey);
+  const sorted = episodes
+    .slice()
+    .sort((a, b) => a.season - b.season || a.episode - b.episode);
+
+  const itemsHtml = sorted
+    .map((e) => {
+      const watched =
+        prog && prog.season === e.season && prog.episode === e.episode;
+      const code = `S${String(e.season).padStart(2, "0")}E${String(e.episode).padStart(2, "0")}`;
+      const display = String(e.name)
+        .replace(/\.[^/.]+$/, "")
+        .replace(/_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return `<button class="episode-picker-item ${watched ? "watched" : ""}" data-file="${encodeURIComponent(e.name)}">
+        <span class="epi-code">${code}${watched ? " •" : ""}</span>
+        <span class="epi-name">${escapeHtml(display)}</span>
+      </button>`;
+    })
+    .join("");
+
+  const overlay = document.createElement("div");
+  overlay.className = "episode-picker-overlay";
+  overlay.innerHTML = `
+    <div class="episode-picker-content">
+      <div class="episode-picker-header">
+        <h3>bölüm_seçici.</h3>
+        <button class="episode-picker-close">kapat.</button>
+      </div>
+      <div class="episode-picker-body">${itemsHtml}</div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector(".episode-picker-close").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  overlay.querySelectorAll(".episode-picker-item").forEach((item) => {
+    item.addEventListener("click", () => {
+      const fileName = decodeURIComponent(item.dataset.file);
+      overlay.remove();
+      openVideoPlayer(fileName);
     });
   });
 }
@@ -2293,6 +2433,10 @@ async function loadVideoSubtitles(fileName) {
 // Open Video Player Modal
 async function openVideoPlayer(fileName) {
   if (!fileName) return;
+
+  // Seri ise izleme ilerlemesini kaydet (kaldığın yerden devam et için)
+  const meta = parseSeriesMetaClient(fileName);
+  if (meta) setSeriesProgress(meta.key, meta.season, meta.episode);
 
   if (elVideoPlayerTitle) elVideoPlayerTitle.textContent = fileName;
   if (elMainVideo) {
