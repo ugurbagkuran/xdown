@@ -3660,6 +3660,27 @@ function makeSelectCustom(selectElement, placeholderPrefix = "") {
   
   selectElement.parentNode.insertBefore(wrapper, selectElement.nextSibling);
   
+  const reposition = () => {
+    if (!dropdownList.parentNode) return;
+    const rect = triggerBtn.getBoundingClientRect();
+    dropdownList.style.position = "fixed";
+    dropdownList.style.left = `${rect.left}px`;
+    dropdownList.style.right = "auto";
+    dropdownList.style.width = `${rect.width}px`;
+    
+    // Yüksekliği sınırla veya scrollHeight'ı kullan
+    const dropdownHeight = Math.min(dropdownList.scrollHeight, 192); // max-h-48 (12rem = 192px)
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+      // Üste aç
+      dropdownList.style.top = `${rect.top - dropdownHeight - 4}px`;
+    } else {
+      // Alta aç
+      dropdownList.style.top = `${rect.bottom + 4}px`;
+    }
+    dropdownList.style.zIndex = "9999";
+  };
+  
   const updateDropdownItems = () => {
     dropdownList.innerHTML = "";
     const options = Array.from(selectElement.options);
@@ -3701,14 +3722,26 @@ function makeSelectCustom(selectElement, placeholderPrefix = "") {
     const isVisible = dropdownList.classList.contains("dropdown-list-visible");
     closeAllDropdowns();
     if (!isVisible) {
+      document.body.appendChild(dropdownList);
+      
+      // Önce konumu ayarla (menü henüz görünmezken)
+      reposition();
+      
+      // Tarayıcının konum değişikliğini kaydetmesi için reflow zorla
+      dropdownList.offsetHeight; 
+      
       dropdownList.classList.add("dropdown-list-visible");
       arrowSpan.classList.add("dropdown-arrow-rotate");
+      
+      // Kaydırma ve yeniden boyutlandırma olaylarını dinle
+      window.addEventListener("scroll", reposition, true);
+      window.addEventListener("resize", reposition);
     }
   });
   
   updateDropdownItems();
 
-  // Intercept programmatic value and selectedIndex changes to sync custom UI
+  // Programatik değer ve selectedIndex değişikliklerini yakalayıp özel UI'ı senkronize et
   const valueDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
   Object.defineProperty(selectElement, "value", {
     get() {
@@ -3745,5 +3778,20 @@ function makeSelectCustom(selectElement, placeholderPrefix = "") {
   wrapper.closeDropdown = () => {
     dropdownList.classList.remove("dropdown-list-visible");
     arrowSpan.classList.remove("dropdown-arrow-rotate");
+    if (dropdownList.parentNode === document.body) {
+      document.body.removeChild(dropdownList);
+      wrapper.appendChild(dropdownList);
+    }
+    
+    // Orijinal absolute stillere geri dön
+    dropdownList.style.position = "";
+    dropdownList.style.left = "";
+    dropdownList.style.right = "";
+    dropdownList.style.width = "";
+    dropdownList.style.top = "";
+    dropdownList.style.zIndex = "";
+    
+    window.removeEventListener("scroll", reposition, true);
+    window.removeEventListener("resize", reposition);
   };
 }
