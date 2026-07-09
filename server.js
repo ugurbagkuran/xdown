@@ -42,12 +42,17 @@ function processTaskQueue() {
   if (activeRunningTasks >= MAX_CONCURRENT_TASKS) return;
 
   const nextTask = taskQueue.shift();
+  const state = tasks.get(nextTask.taskId);
+  if (state && state.status === "cancelled") {
+    console.log(`[Task Queue] Kuyruktaki görev iptal edilmiş, atlanıyor: ${nextTask.taskId}`);
+    processTaskQueue();
+    return;
+  }
+
   activeRunningTasks++;
 
   console.log(`[Task Queue] Görev başlatılıyor: ${nextTask.taskId}. Kalan kuyruk: ${taskQueue.length}`);
   
-  // Set task state status to running
-  const state = tasks.get(nextTask.taskId);
   if (state) {
     state.status = "running";
   }
@@ -1166,9 +1171,7 @@ app.post("/api/download", (req, res) => {
 });
 
 function cleanupTaskFiles(tempDir, tsOutputPath, outputPath, options) {
-  try {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  } catch (_) {}
+  // Kaldığı yerden devam etmeyi desteklemek için geçici segmentleri içeren tempDir klasörünü silmiyoruz.
   try {
     if (fs.existsSync(tsOutputPath)) {
       fs.unlinkSync(tsOutputPath);
@@ -1277,6 +1280,20 @@ function generateVideoThumbnail(inputVideoPath, outputImagePath) {
   });
 }
 
+function stableTempDirForOutput(outputPath) {
+  // Aynı çıktı adı için kararlı temp klasörü: yarıda kalan indirmeler kaldığı yerden devam edebilir
+  const base = path
+    .basename(outputPath)
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 120);
+  const hash = crypto
+    .createHash("sha1")
+    .update(String(outputPath))
+    .digest("hex")
+    .slice(0, 10);
+  return path.join(process.cwd(), "downloads", `.temp_${base}_${hash}`);
+}
+
 async function runTask(taskId, urls, outputPath, options) {
   const state = tasks.get(taskId);
   const concurrencyLimit = parseInt(options.concurrency || 5, 10);
@@ -1310,8 +1327,8 @@ async function runTask(taskId, urls, outputPath, options) {
     ? outputPath.replace(/\.mp4$/i, ".ts")
     : outputPath;
 
-  // Create temporary directory for segment files
-  const tempDir = path.join(process.cwd(), "downloads", `temp_${taskId}`);
+  // Create temporary directory for segment files (stable path for resume)
+  const tempDir = stableTempDirForOutput(outputPath);
   try {
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
@@ -1321,6 +1338,26 @@ async function runTask(taskId, urls, outputPath, options) {
     state.status = "error";
     return;
   }
+
+  // Daha önce indirilmiş segmentleri say (kaldığı yerden devam)
+  let resumedCount = 0;
+  try {
+    for (let i = 0; i < urls.length; i++) {
+      const segmentPath = path.join(tempDir, `segment_${i}.ts`);
+      if (fs.existsSync(segmentPath)) {
+        const st = fs.statSync(segmentPath);
+        if (st.isFile() && st.size > 0) {
+          resumedCount++;
+        }
+      }
+    }
+    if (resumedCount > 0) {
+      state.completed = resumedCount;
+      state.logs.push(
+        `Kaldığı yerden devam: ${resumedCount}/${urls.length} segment zaten indirilmiş, atlanıyor.`,
+      );
+    }
+  } catch (_) {}
 
   // Ayna sunucu doğrulama testi (Ayna sunucular gerçekten aktif mi?)
   let activeCandidateHosts = [];
@@ -1361,6 +1398,18 @@ async function runTask(taskId, urls, outputPath, options) {
     while (currentIndex < queue.length) {
       if (state.status === "cancelled") break;
       const item = queue[currentIndex++];
+
+      // Kaldığı yerden devam: mevcut segment varsa atla
+      const segmentPath = path.join(tempDir, `segment_${item.idx}.ts`);
+      try {
+        if (fs.existsSync(segmentPath)) {
+          const st = fs.statSync(segmentPath);
+          if (st.isFile() && st.size > 0) {
+            // resumedCount zaten state.completed'a eklendi; tekrar sayma
+            continue;
+          }
+        }
+      } catch (_) {}
 
       // Sunucu bot algılamasını engellemek için isteklerin stagger gecikmesi
       const staggerDelay = Math.floor(Math.random() * 150);
@@ -1416,7 +1465,6 @@ async function runTask(taskId, urls, outputPath, options) {
       if (success && buffer) {
         try {
           const decrypted = applyDecryption(buffer, options.method, options);
-          const segmentPath = path.join(tempDir, `segment_${item.idx}.ts`);
           await fs.promises.writeFile(segmentPath, decrypted);
           state.completed++;
         } catch (err) {
@@ -1484,10 +1532,7 @@ async function runTask(taskId, urls, outputPath, options) {
     writeStream.destroy();
     state.logs.push(`Birleştirme sırasında hata oluştu: ${err.message}`);
     state.status = "error";
-    // Cleanup temp dir
-    try {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    } catch (_) {}
+    // Kaldığı yerden devam etmeyi desteklemek için tempDir klasörünü silmiyoruz.
     return;
   }
 

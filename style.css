@@ -412,3 +412,420 @@
 .library-group + .library-group {
     margin-top: 8px;
 }
+
+/* Netflix Tarzı Dizi Kartı Etiketleri ve İyileştirmeler */
+.library-series-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(229, 9, 20, 0.95); /* Netflix Kırmızısı */
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    z-index: 10;
+    letter-spacing: 0.8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Netflix Tarzı Bölüm Seçici Modal */
+.episode-picker-overlay {
+    backdrop-filter: blur(16px);
+    background: rgba(0, 0, 0, 0.85);
+}
+
+.episode-picker-content {
+    background: #141414; /* Netflix Siyahı */
+    border: 1px solid #2f2f2f;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    max-width: 800px;
+    width: 90%;
+    animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.episode-picker-header {
+    border-bottom: 1px solid #2f2f2f;
+    padding: 20px 24px;
+}
+
+.episode-picker-header h3 {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 18px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+/* Sezon Seçimi Sekmeleri */
+.season-tabs-container {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px;
+    background: #181818;
+    border-bottom: 1px solid #2f2f2f;
+    overflow-x: auto;
+}
+
+.season-tab {
+    background: #2f2f2f;
+    color: #e5e5e5;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.season-tab:hover {
+    background: #3f3f3f;
+    color: #ffffff;
+}
+
+.season-tab.active {
+    background: #f8a380; /* Proje renk temasına uygun kalsın */
+    color: #141414;
+    font-weight: 700;
+}
+
+/* Bölüm Listesi */
+.episode-picker-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px 24px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+/* Her Bir Bölüm Satırı */
+.episode-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: #181818;
+    border: 1px solid #232323;
+    border-radius: 8px;
+    padding: 12px 16px;
+    transition: all 0.2s ease;
+}
+
+.episode-list-row:hover {
+    background: #222222;
+    border-color: #383838;
+    transform: translateY(-1px);
+}
+
+.episode-list-row.watched {
+    opacity: 0.65;
+    border-color: #2e3c3b;
+}
+
+.episode-row-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.episode-row-num {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f8a380;
+    min-width: 48px;
+}
+
+.episode-row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.episode-row-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.episode-row-meta {
+    font-size: 11px;
+    color: #808080;
+}
+
+.episode-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-episode-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8a380;
+    color: #141414;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-episode-play:hover {
+    background: #ffdbce;
+    transform: scale(1.08);
+}
+
+.btn-episode-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #2f2f2f;
+    color: #ffffff;
+    border: 1px solid #3f3f3f;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-episode-export:hover {
+    background: #3f3f3f;
+    border-color: #f8a380;
+    color: #f8a380;
+}
+
+/* Modal Üst Kapak Detayı */
+.episode-picker-banner {
+    position: relative;
+    height: 120px;
+    background: linear-gradient(to bottom, rgba(20, 20, 20, 0.2), #141414), #1c1c1c;
+    display: flex;
+    align-items: flex-end;
+    padding: 24px;
+    overflow: hidden;
+}
+
+.episode-picker-banner-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #ffffff;
+    z-index: 2;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* Oynatıcı İçi Dikey Bölüm Seçici Paneli */
+#video-episodes-panel {
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.player-ep-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: #141414;
+    border: 1px solid #232323;
+    border-radius: 6px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.player-ep-row:hover {
+    background: #222222;
+    border-color: rgba(248, 163, 128, 0.4);
+}
+
+.player-ep-row.active {
+    border-color: #f8a380;
+    background: #1e1e1e;
+}
+
+.player-ep-row.watched {
+    opacity: 0.6;
+}
+
+/* Ortadaki Büyük Oynat/Duraklat Göstergesi Animasyonu */
+@keyframes giant-indicator-fade {
+    0% {
+        opacity: 0;
+        transform: scale(0.6);
+    }
+    15% {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+    30% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    80% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.2);
+    }
+}
+
+.giant-indicator-animate {
+    animation: giant-indicator-fade 0.8s ease-out forwards;
+}
+
+/* Oynatma Hızı Select Alanı İyileştirmesi */
+#video-speed-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, #ffffff 50%), linear-gradient(135deg, #ffffff 50%, transparent 50%);
+    background-position: calc(100% - 15px) calc(50% - 2px), calc(100% - 10px) calc(50% - 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 25px !important;
+}
+
+#video-speed-select option {
+    background: #000000;
+    color: #ffffff;
+}
+
+/* Otomatik Sonraki Bölüm Paneli Geri Sayım Çemberi Efekti vb. */
+#next-episode-countdown.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* Özel Dropdown Menü Stilleri */
+.dropdown-list-visible {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateY(0) !important;
+}
+
+.dropdown-arrow-rotate {
+    transform: rotate(180deg) !important;
+}
+
+#speed-dropdown-list,
+#subtitle-dropdown-list {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    min-width: 140px;
+    background: rgba(12, 12, 12, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid #2f2f2f;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+}
+
+#speed-dropdown-list button,
+#subtitle-dropdown-list button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: #e5e5e5;
+    padding: 8px 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+#speed-dropdown-list button:hover,
+#subtitle-dropdown-list button:hover {
+    background: rgba(248, 163, 128, 0.1);
+    color: #f8a380;
+}
+
+#speed-dropdown-list button.active,
+#subtitle-dropdown-list button.active,
+#video-season-dropdown-list button.active,
+.custom-select-wrapper button.active {
+    background: rgba(248, 163, 128, 0.2);
+    color: #f8a380;
+    font-weight: 700;
+}
+
+/* Oynatıcı İçi Özel Sezon Seçici Popover */
+#video-season-dropdown-list {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    background: rgba(12, 12, 12, 0.98);
+    backdrop-filter: blur(16px);
+    border: 1px solid #2f2f2f;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+}
+
+#video-season-dropdown-list button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: #e5e5e5;
+    padding: 10px 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+#video-season-dropdown-list button:hover {
+    background: rgba(248, 163, 128, 0.1);
+    color: #f8a380;
+}
+
+/* Dizi Kartı Hover Buton İyileştirmeleri */
+.play-series-continue-btn {
+    background-color: #f8a380 !important;
+    color: #141414 !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 10px 16px !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(248, 163, 128, 0.4) !important;
+    transition: all 0.2s ease !important;
+}
+
+.play-series-continue-btn:hover {
+    background-color: #ffdbce !important;
+    transform: scale(1.03) !important;
+}
+
+.play-series-episodes-btn {
+    background-color: #242529 !important;
+    border: 1px solid #383a40 !important;
+    color: #ffffff !important;
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 10px 16px !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+}
+
+.play-series-episodes-btn:hover {
+    background-color: #2b2d33 !important;
+    border-color: #f8a380 !important;
+    color: #f8a380 !important;
+    transform: scale(1.03) !important;
+}

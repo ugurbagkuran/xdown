@@ -369,6 +369,13 @@ function getEpisodeQuality(streams, lang, quality) {
   );
 }
 
+function getTaskByEpisodeUrl(episodeUrl) {
+  if (!episodeUrl) return null;
+  const taskUrl = episodeDownloadTasksByEpisodeUrl.get(episodeUrl);
+  if (!taskUrl) return null;
+  return downloadTasksByUrl.get(taskUrl) || null;
+}
+
 function updateEpisodeDownloadState(task, pct = task.progress || 0) {
   if (!task.itemElement) return;
 
@@ -379,6 +386,12 @@ function updateEpisodeDownloadState(task, pct = task.progress || 0) {
       overlay.style.background = "rgba(255, 110, 64, 0.22)";
     } else if (task.status === "error" || task.status === "cancelled") {
       overlay.style.background = "rgba(255, 92, 92, 0.2)";
+    } else if (
+      task.status === "running" ||
+      task.status === "waiting" ||
+      task.status === "preparing"
+    ) {
+      overlay.style.background = "rgba(255, 110, 64, 0.15)";
     }
   }
 
@@ -389,8 +402,10 @@ function updateEpisodeDownloadState(task, pct = task.progress || 0) {
     if (!epTitleSpan.dataset.baseText) {
       epTitleSpan.dataset.baseText = epTitleSpan.textContent;
     }
-    if (task.status === "running") {
-      epTitleSpan.textContent = `${epTitleSpan.dataset.baseText} (${pct}%)`;
+    if (task.status === "running" || task.status === "waiting") {
+      const suffix =
+        task.status === "waiting" ? " (sırada)" : ` (${pct}%)`;
+      epTitleSpan.textContent = `${epTitleSpan.dataset.baseText}${suffix}`;
     } else {
       epTitleSpan.textContent = epTitleSpan.dataset.baseText;
     }
@@ -399,9 +414,17 @@ function updateEpisodeDownloadState(task, pct = task.progress || 0) {
   const dlBtn = task.itemElement.querySelector(".ep-dl-btn");
   const cancelBtn = task.itemElement.querySelector(".ep-cancel-btn");
   if (dlBtn && cancelBtn) {
-    const isRunning = task.status === "running" || task.status === "preparing";
-    dlBtn.classList.toggle("hidden", isRunning);
-    cancelBtn.classList.toggle("hidden", !isRunning);
+    // waiting/preparing/running sırasında iptal göster, indir gizle
+    const isActive =
+      task.status === "running" ||
+      task.status === "preparing" ||
+      task.status === "waiting";
+    dlBtn.classList.toggle("hidden", isActive);
+    cancelBtn.classList.toggle("hidden", !isActive);
+    if (!isActive) {
+      dlBtn.disabled = false;
+      dlBtn.innerHTML = `${SVG_DOWNLOAD_ICON} indir.`;
+    }
   }
 }
 
@@ -1351,6 +1374,8 @@ function populateBulkPanelOptions(streams) {
 
   updateQualities();
   elBulkDownloadPanel.classList.remove("hidden");
+  makeSelectCustom(elBulkLang);
+  makeSelectCustom(elBulkQuality);
 }
 
 // Render episodes directly with loaded streams (no empty selects, no latency!)
@@ -1414,6 +1439,9 @@ function renderEpisodes(episodes, seriesTitle, streams) {
 
     const langSelect = mainBar.querySelector(".ep-lang-select");
     const qualitySelect = mainBar.querySelector(".ep-quality-select");
+    
+    makeSelectCustom(langSelect);
+    makeSelectCustom(qualitySelect);
 
     // Sync values with bulk panel initially
     if (activeLang) langSelect.value = activeLang;
@@ -1868,6 +1896,11 @@ function renderFilmSources(filmUrl, filmTitle, playerData) {
   const langSelect = mainBar.querySelector(".ep-lang-select");
   const sourceSelect = mainBar.querySelector(".ep-source-select");
   const qualitySelect = mainBar.querySelector(".ep-quality-select");
+  
+  makeSelectCustom(langSelect);
+  makeSelectCustom(sourceSelect);
+  makeSelectCustom(qualitySelect);
+  
   const dlBtn = mainBar.querySelector(".ep-dl-btn");
   const cancelBtn = mainBar.querySelector(".ep-cancel-btn");
 
@@ -1886,7 +1919,7 @@ function renderFilmSources(filmUrl, filmTitle, playerData) {
   langSelect.addEventListener("change", updateSources);
   updateSources();
 
-  const activeTask = downloadTasksByUrl.get(filmUrl);
+  const activeTask = getTaskByEpisodeUrl(filmUrl);
   if (activeTask) {
     bindTaskToEpisodeItem(activeTask, item);
   }
@@ -1905,30 +1938,37 @@ function renderFilmSources(filmUrl, filmTitle, playerData) {
       if (!sData.success) throw new Error(sData.error || "Kaynak çözülemedi.");
 
       const cleanTitle = filmTitle
-        .replace(/[^a-zA-Z0-9]/g, "_")
+        .replace(/[^a-z0-9ığüşöçİĞÜŞÖÇ\-_ ]/gi, "")
+        .trim()
+        .replace(/\s+/g, "_")
         .replace(/_+/g, "_");
-      
+
       const outputName = `${cleanTitle}_${selectedPlayer}_${selectedQuality}.mp4`;
 
-      autoDownloadFilm(
+      // filmUrl sayfa adresi episodeUrl olarak kaydedilir; görev anahtarı manifest URL'dir
+      await autoDownloadFilm(
         sData.manifestUrl,
         outputName,
         [],
         item,
         filmUrl,
         selectedQuality,
-        sData.streamReferer
+        sData.streamReferer,
       );
-
     } catch (e) {
       alert(`İndirme başlatılamadı: ${e.message}`);
-      dlBtn.disabled = false;
-      dlBtn.innerHTML = `${SVG_DOWNLOAD_ICON} indir.`;
+    } finally {
+      // Aktif görev bağlandıysa updateEpisodeDownloadState butonları yönetir
+      const bound = getTaskByEpisodeUrl(filmUrl);
+      if (!bound || bound.status === "error" || bound.status === "cancelled") {
+        dlBtn.disabled = false;
+        dlBtn.innerHTML = `${SVG_DOWNLOAD_ICON} indir.`;
+      }
     }
   });
 
   cancelBtn.addEventListener("click", async () => {
-    const activeTask = downloadTasksByUrl.get(filmUrl);
+    const activeTask = getTaskByEpisodeUrl(filmUrl);
     if (activeTask && activeTask.taskId) {
       await fetch(`/api/task-cancel/${activeTask.taskId}`, { method: "POST" });
     }
@@ -1958,6 +1998,32 @@ const elVideoTimelineBg = document.getElementById("video-timeline-bg");
 const elVideoTimelineFill = document.getElementById("video-timeline-fill");
 const elVideoTimelineHandle = document.getElementById("video-timeline-handle");
 
+// Netflix Oynatıcı DOM Elemanları
+const elBtnVideoNextEp = document.getElementById("btn-video-next-ep");
+const elVideoSpeedSelect = document.getElementById("video-speed-select");
+const elBtnVideoEpisodes = document.getElementById("btn-video-episodes");
+const elVideoEpisodesPanel = document.getElementById("video-episodes-panel");
+const elBtnCloseEpisodesPanel = document.getElementById("btn-close-episodes-panel");
+const elVideoEpisodesSeasonContainer = document.getElementById("video-episodes-season-container");
+const elVideoEpisodesSeasonSelect = document.getElementById("video-episodes-season-select");
+const elVideoEpisodesList = document.getElementById("video-episodes-list");
+const elNextEpisodeCountdown = document.getElementById("next-episode-countdown");
+const elNextEpCountdownTitle = document.getElementById("next-ep-countdown-title");
+const elNextEpCountdownTime = document.getElementById("next-ep-countdown-time");
+const elBtnNextEpCountdownPlay = document.getElementById("btn-next-ep-countdown-play");
+const elVideoGiantIndicator = document.getElementById("video-giant-indicator");
+
+// Özel Dropdown DOM Elemanları
+const elBtnVideoSpeed = document.getElementById("btn-video-speed");
+const elSpeedDisplayValue = document.getElementById("speed-display-value");
+const elSpeedDropdownList = document.getElementById("speed-dropdown-list");
+const elBtnVideoSubtitle = document.getElementById("btn-video-subtitle");
+const elSubtitleDisplayValue = document.getElementById("subtitle-display-value");
+const elSubtitleDropdownList = document.getElementById("subtitle-dropdown-list");
+const elBtnVideoSeasonPicker = document.getElementById("btn-video-season-picker");
+const elVideoSeasonDisplayValue = document.getElementById("video-season-display-value");
+const elVideoSeasonDropdownList = document.getElementById("video-season-dropdown-list");
+
 // Downloads/Library DOM Elements
 const elLibraryGrid = document.getElementById("library-grid");
 const elLibrarySearchInput = document.getElementById("library-search-input");
@@ -1968,9 +2034,15 @@ let libraryFiles = [];
 
 // Seri bazlı izleme ilerlemesi (localStorage) ve bölüm seçici için indeks
 const librarySeriesIndex = new Map(); // seriesKey -> [{ name, season, episode }]
+let lastPlaybackSaveAt = 0;
+let pendingSeekPosition = null; // openVideoPlayer -> loadedmetadata seek
 
 function seriesProgressKey(seriesKey) {
   return `series_progress_${seriesKey}`;
+}
+
+function playbackPositionKey(fileName) {
+  return `playback_pos_${String(fileName || "")}`;
 }
 
 function getSeriesProgress(seriesKey) {
@@ -1981,10 +2053,126 @@ function getSeriesProgress(seriesKey) {
   }
 }
 
-function setSeriesProgress(seriesKey, season, episode) {
+function setSeriesProgress(seriesKey, season, episode, extra = {}) {
   try {
-    localStorage.setItem(seriesProgressKey(seriesKey), JSON.stringify({ season, episode }));
+    const prev = getSeriesProgress(seriesKey) || {};
+    localStorage.setItem(
+      seriesProgressKey(seriesKey),
+      JSON.stringify({
+        season,
+        episode,
+        position:
+          extra.position !== undefined
+            ? Number(extra.position) || 0
+            : Number(prev.position) || 0,
+        duration:
+          extra.duration !== undefined
+            ? Number(extra.duration) || 0
+            : Number(prev.duration) || 0,
+        fileName:
+          extra.fileName !== undefined
+            ? String(extra.fileName || "")
+            : String(prev.fileName || ""),
+        updatedAt: Date.now(),
+      }),
+    );
   } catch {}
+}
+
+function getPlaybackPositionForFile(fileName) {
+  if (!fileName) return 0;
+  try {
+    const raw = localStorage.getItem(playbackPositionKey(fileName));
+    if (!raw) return 0;
+    const data = JSON.parse(raw);
+    return Number(data.position) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function setPlaybackPositionForFile(fileName, position, duration = 0) {
+  if (!fileName) return;
+  try {
+    localStorage.setItem(
+      playbackPositionKey(fileName),
+      JSON.stringify({
+        position: Number(position) || 0,
+        duration: Number(duration) || 0,
+        updatedAt: Date.now(),
+      }),
+    );
+  } catch {}
+}
+
+function isEpisodeNearlyFinished(position, duration) {
+  if (!Number.isFinite(position) || !Number.isFinite(duration) || duration < 30) {
+    return false;
+  }
+  return position / duration >= 0.9 || duration - position <= 45;
+}
+
+/** Dizide kaldığın yer dosyasını ve (gerekirse) sonraki bölümü bulur. */
+function resolveContinueEpisode(seriesKey, episodes) {
+  if (!episodes || episodes.length === 0) return "";
+  const sorted = episodes
+    .slice()
+    .sort((a, b) => a.season - b.season || a.episode - b.episode);
+  const prog = getSeriesProgress(seriesKey);
+
+  if (prog) {
+    let hit = null;
+    if (prog.fileName) {
+      hit = episodes.find((e) => e.name === prog.fileName) || null;
+    }
+    if (!hit) {
+      hit =
+        episodes.find(
+          (e) => e.season === prog.season && e.episode === prog.episode,
+        ) || null;
+    }
+
+    if (hit) {
+      // Bölüm neredeyse bittiyse bir sonrakine geç
+      if (isEpisodeNearlyFinished(prog.position, prog.duration)) {
+        const idx = sorted.findIndex((e) => e.name === hit.name);
+        if (idx !== -1 && idx < sorted.length - 1) {
+          return sorted[idx + 1].name;
+        }
+      }
+      return hit.name;
+    }
+  }
+
+  // İlerleme yoksa ilk bölümden başla (en son değil!)
+  return sorted[0].name;
+}
+
+function saveCurrentPlaybackProgress(force = false) {
+  if (!elMainVideo || !elVideoPlayerTitle) return;
+  const fileName = elVideoPlayerTitle.textContent;
+  if (!fileName) return;
+
+  const position = elMainVideo.currentTime;
+  const duration = elMainVideo.duration;
+  if (!Number.isFinite(position) || position < 1.5) return;
+  if (!force && Date.now() - lastPlaybackSaveAt < 2500) return;
+  lastPlaybackSaveAt = Date.now();
+
+  setPlaybackPositionForFile(
+    fileName,
+    position,
+    Number.isFinite(duration) ? duration : 0,
+  );
+
+  const meta = parseSeriesMetaClient(fileName);
+  if (meta) {
+    setSeriesProgress(meta.key, meta.season, meta.episode, {
+      position,
+      duration: Number.isFinite(duration) ? duration : 0,
+      fileName,
+    });
+  }
 }
 
 // İstemci tarafı SxxExx ayrıştırıcı (openVideoPlayer'da ilerleme için)
@@ -2113,7 +2301,7 @@ function renderLibraryGrid(files) {
     `;
   });
 
-  // 2) Render grouped library files
+  // 2) Render sorted groups
   sortedGroups.forEach((group) => {
     const items = group.items.slice().sort((a, b) => {
       if (group.isSeries && a.seriesMeta && b.seriesMeta) {
@@ -2125,7 +2313,6 @@ function renderLibraryGrid(files) {
       return new Date(b.file.createdAt).getTime() - new Date(a.file.createdAt).getTime();
     });
 
-    htmlContent += `<div class="library-group col-span-full flex flex-col gap-3">`;
     if (group.isSeries) {
       const seriesKey = group.items[0].seriesMeta.key;
       const episodes = group.items
@@ -2134,46 +2321,54 @@ function renderLibraryGrid(files) {
           name: x.file.name,
           season: x.seriesMeta.season,
           episode: x.seriesMeta.episode,
+          size: x.file.size,
+          createdAt: x.file.createdAt
         }));
       librarySeriesIndex.set(seriesKey, episodes);
 
-      // "Kaldığın yerden devam et" hedefi: izlenen bölüm varsa o, yoksa son bölüm
-      let continueFile = "";
-      const prog = getSeriesProgress(seriesKey);
-      if (prog) {
-        const hit = episodes.find(
-          (e) => e.season === prog.season && e.episode === prog.episode,
-        );
-        if (hit) continueFile = hit.name;
-      }
-      if (!continueFile && episodes.length > 0) {
-        const last = episodes.reduce((a, b) =>
-          b.season > a.season || (b.season === a.season && b.episode > a.episode)
-            ? b
-            : a,
-        );
-        continueFile = last.name;
-      }
+      // Kart görseli olarak serideki en son indirilen bölümün thumbnail'ini kullanalım
+      const latestItem = group.items.reduce((latest, current) => {
+        return new Date(current.file.createdAt) > new Date(latest.file.createdAt) ? current : latest;
+      }, group.items[0]);
+      
+      const encodedFileName = encodeFileDataAttr(latestItem.file.name);
+      const thumbUrl = `/api/video-thumbnail?file=${encodedFileName}&t=${new Date(latestItem.file.createdAt).getTime()}`;
+      const seriesTitle = group.title;
+      const episodeCount = episodes.length;
 
       htmlContent += `
-        <div class="library-group-header">
-          <h3 class="font-mono text-xs text-primary-container tracking-wide">${escapeHtml(group.title)}</h3>
-          <div class="library-group-actions">
-            ${
-              continueFile
-                ? `<button class="btn-continue" data-continue="${encodeURIComponent(continueFile)}"><span class="material-symbols-outlined" style="font-size:14px;">play_arrow</span> kaldığın yerden devam et</button>`
-                : ""
-            }
-            <button class="btn-episode-pick" data-series-index="${escapeHtml(seriesKey)}"><span class="material-symbols-outlined" style="font-size:14px;">playlist_play</span> bölümleri seç</button>
-            <span class="font-mono text-[10px] text-on-surface-variant">${group.items.length} bölüm</span>
+        <div class="group flex flex-col gap-3 cursor-pointer play-series-card-btn" data-series-key="${escapeHtml(seriesKey)}">
+          <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container border border-outline/50 group-hover:border-primary-container/50 transition-colors">
+            <div class="library-series-badge">DİZİ</div>
+            <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" src="${thumbUrl}" alt="${escapeHtml(seriesTitle)}" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');">
+            <div class="video-thumb-fallback hidden w-full h-full flex flex-col items-center justify-center bg-surface-container-high text-on-surface-variant/40 p-4 text-center">
+              <span class="material-symbols-outlined text-4xl">folder_zip</span>
+              <span class="font-mono text-[9px] text-on-surface-variant/30 mt-2">DİZİ ARŞİVİ</span>
+            </div>
+            <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+            
+            <!-- Hover Menüsü (Netflix Tarzı) -->
+            <div class="absolute inset-0 bg-background/90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center backdrop-blur-sm z-10 gap-4 p-6">
+              <!-- Devam Et -->
+              <button class="w-full flex items-center justify-center gap-2 py-2 bg-primary-container text-black font-bold rounded-lg text-xs hover:bg-primary-fixed transition-colors play-series-continue-btn" data-series-key="${escapeHtml(seriesKey)}" onclick="event.stopPropagation();">
+                <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">play_arrow</span> devam et.
+              </button>
+              <!-- Bölümler -->
+              <button class="w-full flex items-center justify-center gap-2 py-2 bg-surface-container-highest border border-outline text-on-surface font-bold rounded-lg text-xs hover:bg-surface-variant transition-colors play-series-episodes-btn" data-series-key="${escapeHtml(seriesKey)}" onclick="event.stopPropagation();">
+                <span class="material-symbols-outlined text-sm">playlist_play</span> bölümler.
+              </button>
+            </div>
+          </div>
+          <div class="flex flex-col px-1">
+            <h3 class="font-bold text-sm text-on-surface truncate group-hover:text-primary-container transition-colors">${escapeHtml(seriesTitle)}</h3>
+            <div class="flex justify-between items-center mt-1">
+              <span class="font-mono text-[10px] text-primary-container/80 font-bold">${episodeCount} Bölüm İndirildi</span>
+            </div>
           </div>
         </div>
       `;
-    }
-
-    htmlContent += `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">`;
-
-    items.forEach(({ file }) => {
+    } else {
+      const { file } = items[0];
       const isTs = file.name.toLowerCase().endsWith(".ts");
       const displaySize = formatBytes(file.size);
       const dateStr = new Date(file.createdAt).toLocaleDateString("tr-TR");
@@ -2206,9 +2401,7 @@ function renderLibraryGrid(files) {
           </div>
         </div>
       `;
-    });
-
-    htmlContent += `</div></div>`;
+    }
   });
 
   elLibraryGrid.innerHTML = htmlContent;
@@ -2241,28 +2434,49 @@ function renderLibraryGrid(files) {
       e.stopPropagation();
       const filmUrl = btn.dataset.url;
       const activeTask = downloadTasksByUrl.get(filmUrl);
-      if (activeTask && activeTask.taskId) {
-        await fetch(`/api/task-cancel/${activeTask.taskId}`, { method: "POST" });
+      if (activeTask) {
         activeTask.status = "cancelled";
+        if (activeTask.taskId) {
+          await fetch(`/api/task-cancel/${activeTask.taskId}`, { method: "POST" });
+        }
+        if (activeTask.interval) clearInterval(activeTask.interval);
+        downloadTasksByUrl.delete(filmUrl);
+        if (activeTask.episodeUrl) {
+          episodeDownloadTasksByEpisodeUrl.delete(activeTask.episodeUrl);
+        }
+        const card = elDmTasksList.querySelector(`[data-task-id="${activeTask.procId}"]`);
+        if (card) card.remove();
+        if (elDmTasksList.children.length === 0) {
+          elDmTasksList.innerHTML = '<div class="dm-empty">aktif indirme yok.</div>';
+        }
+        updateDownloadCountBadge();
         renderLibraryGrid(libraryFiles);
       }
     });
   });
 
-  // "Kaldığın yerden devam et" → ilgili bölümü oynat
-  elLibraryGrid.querySelectorAll(".btn-continue").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const fileName = decodeURIComponent(btn.dataset.continue);
-      if (fileName) openVideoPlayer(fileName);
+  // Dizi kartı tıklaması (varsayılan olarak bölüm seçiciyi açar)
+  elLibraryGrid.querySelectorAll(".play-series-card-btn").forEach(card => {
+    card.addEventListener("click", () => {
+      const seriesKey = card.dataset.seriesKey;
+      openEpisodePicker(seriesKey);
     });
   });
 
-  // "Bölümleri seç" → bölüm seçme panelini aç
-  elLibraryGrid.querySelectorAll(".btn-episode-pick").forEach(btn => {
+  // Hover buton olayları
+  elLibraryGrid.querySelectorAll(".play-series-continue-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      openEpisodePicker(btn.dataset.seriesIndex);
+      const seriesKey = btn.dataset.seriesKey;
+      playSeriesContinue(seriesKey);
+    });
+  });
+
+  elLibraryGrid.querySelectorAll(".play-series-episodes-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const seriesKey = btn.dataset.seriesKey;
+      openEpisodePicker(seriesKey);
     });
   });
 }
@@ -2273,49 +2487,147 @@ function openEpisodePicker(seriesKey) {
   if (!episodes || episodes.length === 0) return;
 
   const prog = getSeriesProgress(seriesKey);
-  const sorted = episodes
-    .slice()
-    .sort((a, b) => a.season - b.season || a.episode - b.episode);
+  
+  // Sezonları bulalım
+  const seasonsSet = new Set();
+  episodes.forEach(e => seasonsSet.add(e.season));
+  const seasons = Array.from(seasonsSet).sort((a, b) => a - b);
+  
+  // Varsayılan aktif sezon: kaldığı yer varsa o, yoksa ilk sezon
+  let activeSeason = seasons[0];
+  if (prog && seasonsSet.has(prog.season)) {
+    activeSeason = prog.season;
+  }
 
-  const itemsHtml = sorted
-    .map((e) => {
-      const watched =
-        prog && prog.season === e.season && prog.episode === e.episode;
+  // "Kaldığın yerden devam et" dosyası (zaman damgası + neredeyse biten bölüm mantığı)
+  const continueFile = resolveContinueEpisode(seriesKey, episodes);
+
+  const overlay = document.createElement("div");
+  overlay.className = "episode-picker-overlay";
+  
+  // Dizi Başlığı (temizlenmiş başlık)
+  const seriesTitle = String(episodes[0].name)
+    .replace(/\.[^/.]+$/, "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .split(/[\s-]+S\d+/i)[0]
+    .trim();
+
+  overlay.innerHTML = `
+    <div class="episode-picker-content">
+      <div class="episode-picker-banner">
+        <div class="episode-picker-banner-title">${escapeHtml(seriesTitle)}</div>
+        <button class="episode-picker-close absolute top-4 right-4 z-20">kapat.</button>
+      </div>
+
+      <div class="flex items-center justify-between px-6 py-4 bg-surface-container-high/40 border-b border-outline/30">
+        <span class="font-mono text-xs text-on-surface-variant">${episodes.length} Bölüm İndirildi</span>
+        ${continueFile ? `
+          <button class="btn-continue text-xs" data-continue="${encodeURIComponent(continueFile)}">
+            <span class="material-symbols-outlined" style="font-size:16px;">play_arrow</span> kaldığın yerden devam et
+          </button>
+        ` : ""}
+      </div>
+
+      ${seasons.length > 1 ? `
+        <div class="season-tabs-container hide-scrollbar">
+          ${seasons.map(s => `
+            <button class="season-tab ${s === activeSeason ? "active" : ""}" data-season="${s}">
+              Sezon ${s}
+            </button>
+          `).join("")}
+        </div>
+      ` : ""}
+
+      <div class="episode-picker-body custom-scrollbar"></div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Bölümleri render eden fonksiyon
+  function renderSeasonEpisodes(seasonNum) {
+    const pickerBody = overlay.querySelector(".episode-picker-body");
+    if (!pickerBody) return;
+
+    const filtered = episodes
+      .filter(e => e.season === seasonNum)
+      .sort((a, b) => a.episode - b.episode);
+
+    pickerBody.innerHTML = filtered.map(e => {
+      const watched = prog && prog.season === e.season && prog.episode === e.episode;
       const code = `S${String(e.season).padStart(2, "0")}E${String(e.episode).padStart(2, "0")}`;
-      const display = String(e.name)
+      
+      const cleanEpTitle = String(e.name)
         .replace(/\.[^/.]+$/, "")
         .replace(/_/g, " ")
         .replace(/\s+/g, " ")
         .trim();
-      return `<button class="episode-picker-item ${watched ? "watched" : ""}" data-file="${encodeURIComponent(e.name)}">
-        <span class="epi-code">${code}${watched ? " •" : ""}</span>
-        <span class="epi-name">${escapeHtml(display)}</span>
-      </button>`;
-    })
-    .join("");
 
-  const overlay = document.createElement("div");
-  overlay.className = "episode-picker-overlay";
-  overlay.innerHTML = `
-    <div class="episode-picker-content">
-      <div class="episode-picker-header">
-        <h3>bölüm_seçici.</h3>
-        <button class="episode-picker-close">kapat.</button>
-      </div>
-      <div class="episode-picker-body">${itemsHtml}</div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
+      const displaySize = formatBytes(e.size);
+      const dateStr = new Date(e.createdAt).toLocaleDateString("tr-TR");
+
+      return `
+        <div class="episode-list-row ${watched ? "watched" : ""}">
+          <div class="episode-row-left">
+            <span class="episode-row-num">${code}</span>
+            <div class="episode-row-info">
+              <span class="episode-row-title">${escapeHtml(cleanEpTitle)}</span>
+              <span class="episode-row-meta">${displaySize} • ${dateStr}</span>
+            </div>
+          </div>
+          <div class="episode-row-actions">
+            <button class="btn-episode-play" data-file="${encodeURIComponent(e.name)}" title="Oynat">
+              <span class="material-symbols-outlined" style="font-size: 18px; font-variation-settings: 'FILL' 1;">play_arrow</span>
+            </button>
+            <button class="btn-episode-export" data-file="${encodeURIComponent(e.name)}">
+              export.
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    pickerBody.querySelectorAll(".btn-episode-play").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const file = decodeURIComponent(btn.dataset.file);
+        overlay.remove();
+        openVideoPlayer(file);
+      });
+    });
+
+    pickerBody.querySelectorAll(".btn-episode-export").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const file = decodeURIComponent(btn.dataset.file);
+        exportVideoFile(file);
+      });
+    });
+  }
+
+  // İlk sezonu render et
+  renderSeasonEpisodes(activeSeason);
 
   overlay.querySelector(".episode-picker-close").addEventListener("click", () => overlay.remove());
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) overlay.remove();
   });
-  overlay.querySelectorAll(".episode-picker-item").forEach((item) => {
-    item.addEventListener("click", () => {
-      const fileName = decodeURIComponent(item.dataset.file);
+
+  const btnContinue = overlay.querySelector(".btn-continue");
+  if (btnContinue) {
+    btnContinue.addEventListener("click", () => {
+      const file = decodeURIComponent(btnContinue.dataset.continue);
       overlay.remove();
-      openVideoPlayer(fileName);
+      openVideoPlayer(file, { resume: true });
+    });
+  }
+
+  overlay.querySelectorAll(".season-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      overlay.querySelectorAll(".season-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const s = Number.parseInt(tab.dataset.season, 10);
+      renderSeasonEpisodes(s);
     });
   });
 }
@@ -2331,6 +2643,16 @@ function exportVideoFile(fileName) {
   document.body.removeChild(a);
 }
 
+function playSeriesContinue(seriesKey) {
+  const episodes = librarySeriesIndex.get(seriesKey);
+  if (!episodes || episodes.length === 0) return;
+
+  const continueFile = resolveContinueEpisode(seriesKey, episodes);
+  if (continueFile) {
+    openVideoPlayer(continueFile, { resume: true });
+  }
+}
+
 function resetVideoSubtitleSelect(label = "altyazi: kapali") {
   if (!elVideoSubtitleSelect) return;
   elVideoSubtitleSelect.innerHTML = "";
@@ -2340,6 +2662,12 @@ function resetVideoSubtitleSelect(label = "altyazi: kapali") {
   elVideoSubtitleSelect.appendChild(option);
   elVideoSubtitleSelect.value = "off";
   elVideoSubtitleSelect.disabled = label !== "altyazi: kapali";
+
+  // Özel altyazı dropdown sıfırlaması
+  if (elSubtitleDisplayValue) elSubtitleDisplayValue.textContent = label;
+  if (elSubtitleDropdownList) {
+    elSubtitleDropdownList.innerHTML = `<button class="active" data-value="off">${label}</button>`;
+  }
 }
 
 function applySelectedSubtitleTrack(trackIndexValue) {
@@ -2421,8 +2749,38 @@ async function loadVideoSubtitles(fileName) {
       elVideoSubtitleSelect.appendChild(option);
     });
 
+    // Özel altyazı dropdown listesini dinamik olarak doldur
+    if (elSubtitleDropdownList) {
+      let subHtml = `<button class="active" data-value="off">altyazi: kapali</button>`;
+      data.subtitles.forEach((sub, index) => {
+        const text = `altyazi: ${sub.label || sub.lang || `sub${index + 1}`}`;
+        subHtml += `<button data-value="${index}">${escapeHtml(text)}</button>`;
+      });
+      elSubtitleDropdownList.innerHTML = subHtml;
+
+      // Özel altyazı buton olayları
+      elSubtitleDropdownList.querySelectorAll("button").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = btn.dataset.value;
+          
+          elSubtitleDropdownList.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          
+          if (elVideoSubtitleSelect) {
+            elVideoSubtitleSelect.value = val;
+            elVideoSubtitleSelect.dispatchEvent(new Event("change"));
+          }
+          
+          if (elSubtitleDisplayValue) elSubtitleDisplayValue.textContent = btn.textContent;
+          closeAllDropdowns();
+        });
+      });
+    }
+
     elVideoSubtitleSelect.disabled = false;
     elVideoSubtitleSelect.value = "off";
+    if (elSubtitleDisplayValue) elSubtitleDisplayValue.textContent = "altyazi: kapali";
     applySelectedSubtitleTrack("off");
   } catch (err) {
     console.error("Altyazı listesi yüklenemedi:", err);
@@ -2431,12 +2789,56 @@ async function loadVideoSubtitles(fileName) {
 }
 
 // Open Video Player Modal
-async function openVideoPlayer(fileName) {
+// options.resume: true ise kaydedilmiş zamandan devam et (kaldığın yerden)
+async function openVideoPlayer(fileName, options = {}) {
   if (!fileName) return;
+  const shouldResume = options.resume !== false; // varsayılan: kaldığın yerden
+
+  // Oynatma hızını sıfırla
+  if (elVideoSpeedSelect) elVideoSpeedSelect.value = "1";
+  if (elMainVideo) elMainVideo.playbackRate = 1;
+
+  // Açık olan panelleri ve sayacı sıfırla
+  closeEpisodesPanel();
+  hideNextEpisodeCountdown();
 
   // Seri ise izleme ilerlemesini kaydet (kaldığın yerden devam et için)
+  // Not: zaman damgası timeupdate/close ile güncellenir; burada sadece bölüm bilgisini tutarız.
   const meta = parseSeriesMetaClient(fileName);
-  if (meta) setSeriesProgress(meta.key, meta.season, meta.episode);
+  if (meta) {
+    const prev = getSeriesProgress(meta.key);
+    const keepPosition =
+      prev &&
+      prev.fileName === fileName &&
+      Number.isFinite(prev.position)
+        ? prev.position
+        : getPlaybackPositionForFile(fileName);
+    const keepDuration =
+      prev && prev.fileName === fileName && Number.isFinite(prev.duration)
+        ? prev.duration
+        : 0;
+    setSeriesProgress(meta.key, meta.season, meta.episode, {
+      position: keepPosition || 0,
+      duration: keepDuration || 0,
+      fileName,
+    });
+    // Sonraki bölüm kontrolü
+    updateNextEpisodeButtonState(fileName);
+    if (elBtnVideoEpisodes) elBtnVideoEpisodes.classList.remove("hidden");
+    setupEpisodesPanel(meta.key, fileName);
+  } else {
+    if (elBtnVideoNextEp) elBtnVideoNextEp.classList.add("hidden");
+    if (elBtnVideoEpisodes) elBtnVideoEpisodes.classList.add("hidden");
+  }
+
+  // Kaldığın saniyeyi hazırla (neredeyse bitmişse baştan)
+  pendingSeekPosition = null;
+  if (shouldResume) {
+    const savedPos = getPlaybackPositionForFile(fileName);
+    if (savedPos > 5) {
+      pendingSeekPosition = savedPos;
+    }
+  }
 
   if (elVideoPlayerTitle) elVideoPlayerTitle.textContent = fileName;
   if (elMainVideo) {
@@ -2475,6 +2877,13 @@ async function openVideoPlayer(fileName) {
 
 // Close Video Player Modal
 function closeVideoPlayer() {
+  // Kapatmadan önce kaldığın yeri kaydet
+  saveCurrentPlaybackProgress(true);
+
+  closeEpisodesPanel();
+  hideNextEpisodeCountdown();
+  pendingSeekPosition = null;
+
   if (elMainVideo) {
     elMainVideo.pause();
     clearVideoSubtitleTracks();
@@ -2493,9 +2902,23 @@ if (elBtnCloseVideo) {
 }
 
 // Play & Pause Controls
+function triggerGiantPlayIndicator(isPlay) {
+  if (!elVideoGiantIndicator) return;
+  const icon = elVideoGiantIndicator.querySelector("span");
+  if (!icon) return;
+  
+  icon.textContent = isPlay ? "play_arrow" : "pause";
+  
+  elVideoGiantIndicator.classList.remove("giant-indicator-animate");
+  elVideoGiantIndicator.classList.remove("opacity-0");
+  void elVideoGiantIndicator.offsetWidth; // Reflow
+  elVideoGiantIndicator.classList.add("giant-indicator-animate");
+}
+
 function togglePlay() {
   if (!elMainVideo) return;
-  if (elMainVideo.paused) {
+  const isPlay = elMainVideo.paused;
+  if (isPlay) {
     const playResult = elMainVideo.play();
     if (playResult && typeof playResult.catch === "function") {
       playResult.catch((err) => {
@@ -2506,6 +2929,7 @@ function togglePlay() {
     elMainVideo.pause();
   }
   updatePlayPauseIcon();
+  triggerGiantPlayIndicator(isPlay);
 }
 
 function updatePlayPauseIcon() {
@@ -2609,16 +3033,88 @@ if (elMainVideo) {
     if (elVideoDuration) elVideoDuration.textContent = formatTime(elMainVideo.duration);
   });
 
+  // Kaldığın saniyeye daha güvenilir şekilde sarabilmek için canplay olayını dinliyoruz
+  elMainVideo.addEventListener("canplay", () => {
+    if (
+      pendingSeekPosition !== null &&
+      Number.isFinite(elMainVideo.duration) &&
+      elMainVideo.duration > 10
+    ) {
+      let seekTo = pendingSeekPosition;
+      // Neredeyse bitmişse baştan başlat
+      if (isEpisodeNearlyFinished(seekTo, elMainVideo.duration)) {
+        seekTo = 0;
+      } else {
+        seekTo = Math.min(seekTo, Math.max(0, elMainVideo.duration - 3));
+      }
+      if (seekTo > 5) {
+        try {
+          elMainVideo.currentTime = seekTo;
+        } catch (_) {}
+      }
+      pendingSeekPosition = null;
+    }
+  });
+
   elMainVideo.addEventListener("timeupdate", () => {
     if (elVideoCurrentTime) elVideoCurrentTime.textContent = formatTime(elMainVideo.currentTime);
     if (elMainVideo.duration) {
       const pct = (elMainVideo.currentTime / elMainVideo.duration) * 100;
       if (elVideoTimelineFill) elVideoTimelineFill.style.width = `${pct}%`;
       if (elVideoTimelineHandle) elVideoTimelineHandle.style.left = `${pct}%`;
+
+      // İzleme konumunu periyodik kaydet (kaldığın yerden devam için)
+      saveCurrentPlaybackProgress(false);
+
+      // Netflix Otomatik Sonraki Bölüm Geri Sayımı
+      if (elMainVideo.duration > 30) {
+        const timeLeft = elMainVideo.duration - elMainVideo.currentTime;
+        const currentFile = elVideoPlayerTitle ? elVideoPlayerTitle.textContent : "";
+        const meta = parseSeriesMetaClient(currentFile);
+        if (meta) {
+          const episodes = librarySeriesIndex.get(meta.key);
+          if (episodes && episodes.length > 0) {
+            const sorted = episodes.slice().sort((a, b) => a.season - b.season || a.episode - b.episode);
+            const currentIndex = sorted.findIndex(e => e.name === currentFile);
+            if (currentIndex !== -1 && currentIndex < sorted.length - 1) {
+              const nextEp = sorted[currentIndex + 1];
+              if (timeLeft <= 15 && timeLeft > 0.5) {
+                showNextEpisodeCountdown(nextEp, Math.ceil(timeLeft));
+              } else if (timeLeft <= 0.5) {
+                hideNextEpisodeCountdown();
+                playSeriesNextEpisode(currentFile);
+              } else {
+                hideNextEpisodeCountdown();
+              }
+            }
+          }
+        }
+      }
     }
   });
 
+  elMainVideo.addEventListener("pause", () => {
+    saveCurrentPlaybackProgress(true);
+  });
+
   elMainVideo.addEventListener("ended", () => {
+    // Biten bölümü %100 tamamlandı olarak işaretle (continue sonraki bölüme geçsin)
+    if (elVideoPlayerTitle && Number.isFinite(elMainVideo.duration)) {
+      setPlaybackPositionForFile(
+        elVideoPlayerTitle.textContent,
+        elMainVideo.duration,
+        elMainVideo.duration,
+      );
+      const meta = parseSeriesMetaClient(elVideoPlayerTitle.textContent);
+      if (meta) {
+        setSeriesProgress(meta.key, meta.season, meta.episode, {
+          position: elMainVideo.duration,
+          duration: elMainVideo.duration,
+          fileName: elVideoPlayerTitle.textContent,
+        });
+      }
+    }
+
     if (elMainVideo.currentTime < 2) {
       fetch("/api/log", {
         method: "POST",
@@ -2774,7 +3270,452 @@ function handleVideoKeydown(e) {
   }
 }
 
+// Sayfa kapatılırken veya yenilenirken son izleme konumunu kaydet
+window.addEventListener("beforeunload", () => {
+  saveCurrentPlaybackProgress(true);
+});
+
 // Initialization on DOM load
 window.addEventListener("DOMContentLoaded", () => {
   fetchDownloadsList();
+
+  // Netflix Oynatıcı Kontrol Dinleyicileri
+  if (elVideoSpeedSelect && elMainVideo) {
+    elVideoSpeedSelect.addEventListener("change", (e) => {
+      elMainVideo.playbackRate = Number.parseFloat(e.target.value);
+    });
+  }
+
+  // Özel Hız Seçimi Olayları
+  if (elBtnVideoSpeed) {
+    elBtnVideoSpeed.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSpeedDropdown();
+    });
+  }
+
+  if (elSpeedDropdownList) {
+    elSpeedDropdownList.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const val = btn.dataset.value;
+        
+        elSpeedDropdownList.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        
+        if (elVideoSpeedSelect) {
+          elVideoSpeedSelect.value = val;
+          elVideoSpeedSelect.dispatchEvent(new Event("change"));
+        }
+        
+        if (elSpeedDisplayValue) {
+          elSpeedDisplayValue.textContent = val === "1" ? "hız: 1x" : `${val}x`;
+        }
+        
+        closeAllDropdowns();
+      });
+    });
+  }
+
+  // Özel Altyazı Dropdown Tetikleyicisi
+  if (elBtnVideoSubtitle) {
+    elBtnVideoSubtitle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSubtitleDropdown();
+    });
+  }
+
+  if (elBtnVideoEpisodes) {
+    elBtnVideoEpisodes.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleEpisodesPanel();
+    });
+  }
+
+  if (elBtnCloseEpisodesPanel) {
+    elBtnCloseEpisodesPanel.addEventListener("click", () => {
+      closeEpisodesPanel();
+    });
+  }
+
+  if (elBtnVideoNextEp) {
+    elBtnVideoNextEp.addEventListener("click", () => {
+      const nextFile = decodeURIComponent(elBtnVideoNextEp.dataset.nextFile);
+      if (nextFile) {
+        openVideoPlayer(nextFile);
+      }
+    });
+  }
+
+  // Özel Sezon Dropdown Tetikleyicisi
+  if (elBtnVideoSeasonPicker) {
+    elBtnVideoSeasonPicker.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleSeasonDropdown();
+    });
+  }
+
+  // Click Outside (Dışarı tıklandığında menüleri kapat)
+  document.addEventListener("click", () => {
+    closeAllDropdowns();
+  });
 });
+
+// ==========================================================================
+// Netflix Oynatıcı Yardımcı Fonksiyonları
+// ==========================================================================
+
+function toggleEpisodesPanel() {
+  if (!elVideoEpisodesPanel) return;
+  const isOpen = elVideoEpisodesPanel.classList.contains("translate-x-0");
+  if (isOpen) {
+    closeEpisodesPanel();
+  } else {
+    elVideoEpisodesPanel.classList.remove("translate-x-full");
+    elVideoEpisodesPanel.classList.add("translate-x-0");
+    showControls(); // Kontrolleri açık tut
+  }
+}
+
+function closeEpisodesPanel() {
+  if (!elVideoEpisodesPanel) return;
+  elVideoEpisodesPanel.classList.remove("translate-x-0");
+  elVideoEpisodesPanel.classList.add("translate-x-full");
+}
+
+function setupEpisodesPanel(seriesKey, currentFileName) {
+  const episodes = librarySeriesIndex.get(seriesKey);
+  if (!episodes || episodes.length === 0 || !elVideoEpisodesList) return;
+
+  const prog = getSeriesProgress(seriesKey);
+  const seasonsSet = new Set();
+  episodes.forEach(e => seasonsSet.add(e.season));
+  const seasons = Array.from(seasonsSet).sort((a, b) => a - b);
+
+  // Sezon Seçici Dropdown
+  if (elVideoEpisodesSeasonSelect && elVideoEpisodesSeasonContainer) {
+    if (seasons.length > 1) {
+      elVideoEpisodesSeasonContainer.classList.remove("hidden");
+      elVideoEpisodesSeasonSelect.innerHTML = seasons.map(s => `
+        <option value="${s}">Sezon ${s}</option>
+      `).join("");
+      
+      const currentMeta = parseSeriesMetaClient(currentFileName);
+      let currentSeasonVal = seasons[0];
+      if (currentMeta && seasonsSet.has(currentMeta.season)) {
+        currentSeasonVal = currentMeta.season;
+      }
+      elVideoEpisodesSeasonSelect.value = String(currentSeasonVal);
+
+      // Özel dropdown başlığını güncelle
+      if (elVideoSeasonDisplayValue) elVideoSeasonDisplayValue.textContent = `Sezon ${currentSeasonVal}`;
+
+      // Özel dropdown listesini doldur
+      if (elVideoSeasonDropdownList) {
+        elVideoSeasonDropdownList.innerHTML = seasons.map(s => `
+          <button class="${s === currentSeasonVal ? "active" : ""}" data-value="${s}">Sezon ${s}</button>
+        `).join("");
+
+        // Özel dropdown buton olaylarını bağla
+        elVideoSeasonDropdownList.querySelectorAll("button").forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const sVal = Number.parseInt(btn.dataset.value, 10);
+            
+            elVideoSeasonDropdownList.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            
+            if (elVideoSeasonDisplayValue) elVideoSeasonDisplayValue.textContent = btn.textContent;
+            
+            if (elVideoEpisodesSeasonSelect) {
+              elVideoEpisodesSeasonSelect.value = String(sVal);
+              elVideoEpisodesSeasonSelect.dispatchEvent(new Event("change"));
+            }
+            closeAllDropdowns();
+          });
+        });
+      }
+    } else {
+      elVideoEpisodesSeasonContainer.classList.add("hidden");
+    }
+  }
+
+  function renderPanelEpisodes(seasonNum) {
+    const filtered = episodes
+      .filter(e => e.season === seasonNum)
+      .sort((a, b) => a.episode - b.episode);
+
+    elVideoEpisodesList.innerHTML = filtered.map(e => {
+      const isCurrent = e.name === currentFileName;
+      const watched = prog && prog.season === e.season && prog.episode === e.episode;
+      const code = `S${String(e.season).padStart(2, "0")}E${String(e.episode).padStart(2, "0")}`;
+      
+      const cleanTitle = String(e.name)
+        .replace(/\.[^/.]+$/, "")
+        .replace(/_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return `
+        <div class="player-ep-row ${isCurrent ? "active" : ""} ${watched ? "watched" : ""}" data-file="${encodeURIComponent(e.name)}">
+          <div class="flex flex-col gap-1 min-w-0">
+            <span class="font-mono text-[9px] text-primary-container font-bold">${code}${isCurrent ? " • oynatılıyor" : ""}</span>
+            <span class="text-xs text-on-surface truncate font-semibold">${escapeHtml(cleanTitle)}</span>
+          </div>
+          <span class="material-symbols-outlined text-sm flex-shrink-0 text-primary-container/80">play_arrow</span>
+        </div>
+      `;
+    }).join("");
+
+    elVideoEpisodesList.querySelectorAll(".player-ep-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const file = decodeURIComponent(row.dataset.file);
+        closeEpisodesPanel();
+        openVideoPlayer(file);
+      });
+    });
+  }
+
+  const initialSeason = elVideoEpisodesSeasonSelect ? Number.parseInt(elVideoEpisodesSeasonSelect.value, 10) : seasons[0];
+  renderPanelEpisodes(initialSeason || seasons[0]);
+
+  if (elVideoEpisodesSeasonSelect) {
+    elVideoEpisodesSeasonSelect.onchange = () => {
+      const s = Number.parseInt(elVideoEpisodesSeasonSelect.value, 10);
+      renderPanelEpisodes(s);
+    };
+  }
+}
+
+function updateNextEpisodeButtonState(currentFileName) {
+  if (!elBtnVideoNextEp) return;
+  const meta = parseSeriesMetaClient(currentFileName);
+  if (!meta) {
+    elBtnVideoNextEp.classList.add("hidden");
+    return;
+  }
+  const episodes = librarySeriesIndex.get(meta.key);
+  if (episodes && episodes.length > 0) {
+    const sorted = episodes.slice().sort((a, b) => a.season - b.season || a.episode - b.episode);
+    const currentIndex = sorted.findIndex(e => e.name === currentFileName);
+    if (currentIndex !== -1 && currentIndex < sorted.length - 1) {
+      elBtnVideoNextEp.classList.remove("hidden");
+      elBtnVideoNextEp.dataset.nextFile = encodeURIComponent(sorted[currentIndex + 1].name);
+    } else {
+      elBtnVideoNextEp.classList.add("hidden");
+    }
+  } else {
+    elBtnVideoNextEp.classList.add("hidden");
+  }
+}
+
+function playSeriesNextEpisode(currentFileName) {
+  const meta = parseSeriesMetaClient(currentFileName);
+  if (!meta) return;
+  const episodes = librarySeriesIndex.get(meta.key);
+  if (episodes && episodes.length > 0) {
+    const sorted = episodes.slice().sort((a, b) => a.season - b.season || a.episode - b.episode);
+    const currentIndex = sorted.findIndex(e => e.name === currentFileName);
+    if (currentIndex !== -1 && currentIndex < sorted.length - 1) {
+      const nextFile = sorted[currentIndex + 1].name;
+      openVideoPlayer(nextFile);
+    }
+  }
+}
+
+function showNextEpisodeCountdown(nextEp, secondsLeft) {
+  if (!elNextEpisodeCountdown) return;
+  
+  const cleanEpTitle = String(nextEp.name)
+    .replace(/\.[^/.]+$/, "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (elNextEpCountdownTitle) elNextEpCountdownTitle.textContent = cleanEpTitle;
+  if (elNextEpCountdownTime) elNextEpCountdownTime.textContent = `${secondsLeft} saniye içinde...`;
+  
+  elNextEpisodeCountdown.classList.add("visible");
+  
+  if (elBtnNextEpCountdownPlay) {
+    elBtnNextEpCountdownPlay.onclick = () => {
+      hideNextEpisodeCountdown();
+      openVideoPlayer(nextEp.name);
+    };
+  }
+}
+
+function hideNextEpisodeCountdown() {
+  if (!elNextEpisodeCountdown) return;
+  elNextEpisodeCountdown.classList.remove("visible");
+}
+
+function toggleSpeedDropdown() {
+  if (!elSpeedDropdownList) return;
+  const isVisible = elSpeedDropdownList.classList.contains("dropdown-list-visible");
+  closeAllDropdowns();
+  if (!isVisible) {
+    elSpeedDropdownList.classList.add("dropdown-list-visible");
+    if (elBtnVideoSpeed) {
+      const arrow = elBtnVideoSpeed.querySelector(".select-arrow-icon");
+      if (arrow) arrow.classList.add("dropdown-arrow-rotate");
+    }
+  }
+}
+
+function toggleSubtitleDropdown() {
+  if (!elSubtitleDropdownList) return;
+  const isVisible = elSubtitleDropdownList.classList.contains("dropdown-list-visible");
+  closeAllDropdowns();
+  if (!isVisible) {
+    elSubtitleDropdownList.classList.add("dropdown-list-visible");
+    if (elBtnVideoSubtitle) {
+      const arrow = elBtnVideoSubtitle.querySelector(".select-arrow-icon");
+      if (arrow) arrow.classList.add("dropdown-arrow-rotate");
+    }
+  }
+}
+
+function toggleSeasonDropdown() {
+  if (!elVideoSeasonDropdownList) return;
+  const isVisible = elVideoSeasonDropdownList.classList.contains("dropdown-list-visible");
+  closeAllDropdowns();
+  if (!isVisible) {
+    elVideoSeasonDropdownList.classList.add("dropdown-list-visible");
+    if (elBtnVideoSeasonPicker) {
+      const arrow = elBtnVideoSeasonPicker.querySelector(".select-arrow-icon");
+      if (arrow) arrow.classList.add("dropdown-arrow-rotate");
+    }
+  }
+}
+
+function closeAllDropdowns() {
+  if (elSpeedDropdownList) elSpeedDropdownList.classList.remove("dropdown-list-visible");
+  if (elSubtitleDropdownList) elSubtitleDropdownList.classList.remove("dropdown-list-visible");
+  if (elVideoSeasonDropdownList) elVideoSeasonDropdownList.classList.remove("dropdown-list-visible");
+  
+  if (elBtnVideoSpeed) {
+    const arrow = elBtnVideoSpeed.querySelector(".select-arrow-icon");
+    if (arrow) arrow.classList.remove("dropdown-arrow-rotate");
+  }
+  if (elBtnVideoSubtitle) {
+    const arrow = elBtnVideoSubtitle.querySelector(".select-arrow-icon");
+    if (arrow) arrow.classList.remove("dropdown-arrow-rotate");
+  }
+  if (elBtnVideoSeasonPicker) {
+    const arrow = elBtnVideoSeasonPicker.querySelector(".select-arrow-icon");
+    if (arrow) arrow.classList.remove("dropdown-arrow-rotate");
+  }
+
+  // Dinamik olarak eklenen select dropdown'larını da kapat
+  document.querySelectorAll(".custom-select-wrapper").forEach(wrapper => {
+    if (typeof wrapper.closeDropdown === "function") {
+      wrapper.closeDropdown();
+    }
+  });
+}
+
+function makeSelectCustom(selectElement, placeholderPrefix = "") {
+  if (!selectElement || selectElement.dataset.customized === "true") return;
+  selectElement.dataset.customized = "true";
+  
+  selectElement.style.display = "none";
+  
+  const wrapper = document.createElement("div");
+  wrapper.className = "relative inline-block custom-select-wrapper";
+  
+  if (selectElement.className) {
+    const classes = selectElement.className.replace("hidden", "").trim();
+    if (classes) {
+      wrapper.className += " " + classes;
+    }
+  }
+  if (selectElement.style.minWidth) {
+    wrapper.style.minWidth = selectElement.style.minWidth;
+  }
+  
+  const triggerBtn = document.createElement("button");
+  triggerBtn.className = "h-8 min-w-[70px] bg-black/40 border border-outline rounded-lg px-2.5 font-mono text-[10px] text-on-surface hover:text-primary-container hover:border-primary-container transition-all flex items-center justify-between gap-1 w-full";
+  triggerBtn.type = "button";
+  
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "truncate flex-grow text-left";
+  
+  const arrowSpan = document.createElement("span");
+  arrowSpan.className = "material-symbols-outlined text-[12px] transition-transform select-arrow-icon shrink-0";
+  arrowSpan.style.fontSize = "12px";
+  arrowSpan.textContent = "keyboard_arrow_down";
+  
+  triggerBtn.appendChild(labelSpan);
+  triggerBtn.appendChild(arrowSpan);
+  
+  const dropdownList = document.createElement("div");
+  dropdownList.className = "absolute top-9 right-0 bg-black/95 border border-outline/30 rounded-lg py-1 shadow-2xl z-30 min-w-full flex flex-col gap-0.5 transition-all opacity-0 pointer-events-none transform -translate-y-1 max-h-48 overflow-y-auto custom-scrollbar";
+  
+  wrapper.appendChild(triggerBtn);
+  wrapper.appendChild(dropdownList);
+  
+  selectElement.parentNode.insertBefore(wrapper, selectElement.nextSibling);
+  
+  const updateDropdownItems = () => {
+    dropdownList.innerHTML = "";
+    const options = Array.from(selectElement.options);
+    
+    const activeIndex = selectElement.selectedIndex >= 0 ? selectElement.selectedIndex : 0;
+    const activeOption = options[activeIndex];
+    if (activeOption) {
+      labelSpan.textContent = activeOption.textContent;
+    } else {
+      labelSpan.textContent = placeholderPrefix || "...";
+    }
+    
+    options.forEach((opt, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "px-3 py-1.5 text-left font-mono text-[10px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors w-full truncate block";
+      if (idx === activeIndex) {
+        btn.classList.add("active");
+      }
+      btn.textContent = opt.textContent;
+      btn.dataset.value = opt.value;
+      
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        
+        selectElement.value = opt.value;
+        selectElement.dispatchEvent(new Event("change"));
+        
+        updateDropdownItems();
+        closeAllDropdowns();
+      });
+      
+      dropdownList.appendChild(btn);
+    });
+  };
+  
+  triggerBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isVisible = dropdownList.classList.contains("dropdown-list-visible");
+    closeAllDropdowns();
+    if (!isVisible) {
+      dropdownList.classList.add("dropdown-list-visible");
+      arrowSpan.classList.add("dropdown-arrow-rotate");
+    }
+  });
+  
+  updateDropdownItems();
+  
+  const observer = new MutationObserver(() => {
+    updateDropdownItems();
+  });
+  observer.observe(selectElement, { childList: true, characterData: true, subtree: true });
+  
+  selectElement.addEventListener("change", () => {
+    updateDropdownItems();
+  });
+  
+  wrapper.closeDropdown = () => {
+    dropdownList.classList.remove("dropdown-list-visible");
+    arrowSpan.classList.remove("dropdown-arrow-rotate");
+  };
+}

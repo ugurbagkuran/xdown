@@ -103,8 +103,8 @@
             </div>
         </div>
         <div class="flex px-margin-mobile gap-6 overflow-x-auto border-b border-outline-variant pt-2">
-            <button id="nav-search-mobile" class="nav-tab-btn text-primary-container font-bold border-b-2 border-primary-container pb-2 text-sm whitespace-nowrap" data-tab="tab-search">film_ara.</button>
-            <button id="nav-library-mobile" class="nav-tab-btn text-on-surface-variant font-medium pb-2 text-sm whitespace-nowrap" data-tab="tab-library">kutuphane.</button>
+            <button id="nav-library-mobile" class="nav-tab-btn text-primary-container font-bold border-b-2 border-primary-container pb-2 text-sm whitespace-nowrap" data-tab="tab-library">kutuphane.</button>
+            <button id="nav-search-mobile" class="nav-tab-btn text-on-surface-variant font-medium pb-2 text-sm whitespace-nowrap" data-tab="tab-search">film_ara.</button>
         </div>
     </nav>
 
@@ -115,13 +115,13 @@
             <p class="font-mono text-[10px] text-on-surface-variant mt-1">v4.0.2-stable // system_active.</p>
         </div>
         <nav class="flex flex-col gap-2 flex-grow">
-            <button id="nav-search" class="nav-tab-btn flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-xl font-bold transition-all text-sm text-left w-full" data-tab="tab-search">
-                <span class="material-symbols-outlined">download</span>
-                film_indirme.
-            </button>
-            <button id="nav-library" class="nav-tab-btn flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all text-sm text-left w-full" data-tab="tab-library">
+            <button id="nav-library" class="nav-tab-btn flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-xl font-bold transition-all text-sm text-left w-full scale-95 duration-150" data-tab="tab-library">
                 <span class="material-symbols-outlined">movie_filter</span>
                 kutuphane.
+            </button>
+            <button id="nav-search" class="nav-tab-btn flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all text-sm text-left w-full" data-tab="tab-search">
+                <span class="material-symbols-outlined">download</span>
+                film_indirme.
             </button>
         </nav>
         
@@ -152,8 +152,8 @@
         <!-- Desktop Header -->
         <header class="hidden md:flex justify-between items-center px-margin-desktop py-6 w-full border-b border-outline/30 sticky top-0 bg-background/95 backdrop-blur-md z-30">
             <div class="flex items-center gap-3">
-                <span id="header-icon" class="material-symbols-outlined text-[28px] text-primary-container">download</span>
-                <h2 id="header-title" class="font-mono text-xl font-bold text-on-surface">film_indirme.</h2>
+                <span id="header-icon" class="material-symbols-outlined text-[28px] text-primary-container">movie_filter</span>
+                <h2 id="header-title" class="font-mono text-xl font-bold text-on-surface">kütüphane_</h2>
             </div>
         </header>
 
@@ -161,7 +161,7 @@
         <div class="px-margin-mobile md:px-margin-desktop py-6 w-full flex-grow flex flex-col">
             
             <!-- ══════════ SEKMELİ 1: FİLM ARA ══════════ -->
-            <div id="tab-search" class="tab-panel flex flex-col gap-6">
+            <div id="tab-search" class="tab-panel hidden flex flex-col gap-6">
                 <!-- Search Section Card -->
                 <div class="bg-surface-container border border-outline rounded-xl p-6 flex flex-col gap-4">
                     <div class="flex items-center gap-2 border-b border-outline/30 pb-3">
@@ -197,7 +197,7 @@
             </div>
 
             <!-- ══════════ SEKMELİ 2: KÜTÜPHANE ══════════ -->
-            <div id="tab-library" class="tab-panel hidden flex flex-col gap-6">
+            <div id="tab-library" class="tab-panel flex flex-col gap-6">
                 <!-- Library Filter Header -->
                 <div class="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                     <!-- Technical Search -->
@@ -303,6 +303,48 @@
             <div class="video-player-body relative aspect-video flex items-center justify-center group overflow-hidden bg-black">
                 <video id="main-video-element" class="w-full h-full object-contain"></video>
                 
+                <!-- Ortada Büyük Play/Pause Göstergesi -->
+                <div id="video-giant-indicator" class="absolute inset-0 flex items-center justify-center pointer-events-none z-10 opacity-0">
+                    <div class="w-20 h-20 bg-black/60 rounded-full flex items-center justify-center border border-white/20 transform scale-75 transition-all">
+                        <span class="material-symbols-outlined text-[48px] text-white">play_arrow</span>
+                    </div>
+                </div>
+
+                <!-- Otomatik Sonraki Bölüm Sayacı -->
+                <div id="next-episode-countdown" class="absolute bottom-24 right-6 bg-black/95 border border-primary-container/40 p-4 rounded-xl shadow-2xl z-20 flex flex-col gap-2 w-72 transition-all duration-300 transform translate-y-10 opacity-0 pointer-events-none">
+                    <div class="text-[10px] font-mono text-primary-container uppercase tracking-wider font-bold">SIRADAKİ BÖLÜM</div>
+                    <div class="text-xs font-bold text-on-surface truncate" id="next-ep-countdown-title">Bölüm Adı</div>
+                    <div class="flex items-center justify-between gap-4 mt-1">
+                        <span class="text-[11px] text-on-surface-variant font-mono animate-pulse" id="next-ep-countdown-time">15 saniye içinde...</span>
+                        <button id="btn-next-ep-countdown-play" class="px-3 py-1 bg-primary-container text-black font-bold rounded-lg text-[10px] hover:bg-primary-fixed transition-all flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span> Şimdi Oynat
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Oynatıcı İçi Dikey Bölüm Seçici Paneli (Netflix Benzeri) -->
+                <div id="video-episodes-panel" class="absolute top-0 right-0 bottom-0 w-80 bg-black/95 backdrop-blur-md border-l border-outline/20 z-20 flex flex-col translate-x-full">
+                    <div class="p-4 border-b border-outline/20 flex justify-between items-center bg-surface-container/20">
+                        <span class="font-bold text-xs text-primary-container font-mono">bölümler.</span>
+                        <button id="btn-close-episodes-panel" class="text-on-surface-variant hover:text-on-surface flex items-center">
+                            <span class="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                    </div>
+                    <!-- Sezon Seçici Dropdown -->
+                    <div class="p-3 border-b border-outline/10 bg-surface-container/10 hidden relative" id="video-episodes-season-container">
+                        <select id="video-episodes-season-select" class="hidden"></select>
+                        <button id="btn-video-season-picker" class="w-full bg-black/40 border border-outline rounded-lg py-2 px-3 font-mono text-xs text-on-surface flex items-center justify-between gap-1.5 hover:text-primary-container hover:border-primary-container transition-all">
+                            <span id="video-season-display-value">Sezon 1</span>
+                            <span class="material-symbols-outlined text-[14px] transition-transform select-arrow-icon" style="font-size: 14px;">keyboard_arrow_down</span>
+                        </button>
+                        <div id="video-season-dropdown-list" class="absolute left-3 right-3 top-13 bg-black border border-outline/30 rounded-xl py-2 shadow-2xl z-30 flex flex-col gap-1 transition-all opacity-0 pointer-events-none transform -translate-y-2">
+                            <!-- Dinamik doldurulacak -->
+                        </div>
+                    </div>
+                    <!-- Bölüm Listesi -->
+                    <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 custom-scrollbar" id="video-episodes-list"></div>
+                </div>
+
                 <!-- Custom Controls Overlay -->
                 <div class="video-controls-overlay absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-6 flex flex-col gap-4 z-10" id="video-controls-overlay">
                     <!-- Timeline Slider -->
@@ -314,7 +356,7 @@
                     </div>
                     
                     <div class="flex justify-between items-center">
-                        <!-- Left Controls: Play, Rewind, Forward, Volume -->
+                        <!-- Left Controls: Play, Rewind, Forward, Next Episode, Volume -->
                         <div class="flex items-center gap-4">
                             <button id="btn-video-play" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Oynat/Duraklat (Space)">
                                 <span class="material-symbols-outlined">play_arrow</span>
@@ -324,6 +366,9 @@
                             </button>
                             <button id="btn-video-forward" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="10 Saniye İleri (Sağ Yön Tuşu)">
                                 <span class="material-symbols-outlined">forward_10</span>
+                            </button>
+                            <button id="btn-video-next-ep" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all hidden" title="Sonraki Bölüm">
+                                <span class="material-symbols-outlined">skip_next</span>
                             </button>
                             
                             <div class="flex items-center gap-2 group/volume ml-2">
@@ -341,11 +386,52 @@
                             <span id="video-duration">00:00:00</span>
                         </div>
                         
-                        <!-- Right Controls: Subtitle, PiP, Fullscreen -->
+                        <!-- Right Controls: Speed, Episodes, Subtitle, PiP, Fullscreen -->
                         <div class="flex items-center gap-3">
-                            <select id="video-subtitle-select" class="h-9 min-w-[130px] bg-black/40 border border-outline rounded-full px-3 font-mono text-[11px] text-on-surface outline-none" title="Altyazı">
+                            <!-- Gizli Orijinal Select Elementleri (Uyum için) -->
+                            <select id="video-speed-select" class="hidden">
+                                <option value="0.5">0.5x</option>
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>hız: 1x</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                            <select id="video-subtitle-select" class="hidden">
                                 <option value="off">altyazi: kapali</option>
                             </select>
+
+                            <!-- Özel Oynatma Hızı Dropdown -->
+                            <div class="relative inline-block" id="speed-dropdown-wrapper">
+                                <button id="btn-video-speed" class="h-9 min-w-[95px] bg-black/40 border border-outline rounded-full px-3.5 font-mono text-[11px] text-on-surface hover:text-primary-container hover:border-primary-container transition-all flex items-center justify-between gap-1.5" title="Oynatma Hızı">
+                                    <span id="speed-display-value">hız: 1x</span>
+                                    <span class="material-symbols-outlined text-[14px] transition-transform select-arrow-icon" style="font-size: 14px;">keyboard_arrow_up</span>
+                                </button>
+                                <div id="speed-dropdown-list" class="absolute bottom-11 right-0 bg-black/95 border border-outline/30 rounded-xl py-2 shadow-2xl z-30 min-w-[100px] flex flex-col gap-1 transition-all opacity-0 pointer-events-none transform translate-y-2">
+                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="0.5">0.5x</button>
+                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="0.75">0.75x</button>
+                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors active" data-value="1">hız: 1x</button>
+                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="1.25">1.25x</button>
+                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="1.5">1.5x</button>
+                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="2">2x</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Bölümler Paneli Tetikleyici -->
+                            <button id="btn-video-episodes" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all hidden" title="Bölümler">
+                                <span class="material-symbols-outlined">playlist_play</span>
+                            </button>
+
+                            <!-- Özel Altyazı Dropdown -->
+                            <div class="relative inline-block" id="subtitle-dropdown-wrapper">
+                                <button id="btn-video-subtitle" class="h-9 min-w-[130px] bg-black/40 border border-outline rounded-full px-3.5 font-mono text-[11px] text-on-surface hover:text-primary-container hover:border-primary-container transition-all flex items-center justify-between gap-1.5" title="Altyazı">
+                                    <span id="subtitle-display-value">altyazi: kapali</span>
+                                    <span class="material-symbols-outlined text-[14px] transition-transform select-arrow-icon" style="font-size: 14px;">keyboard_arrow_up</span>
+                                </button>
+                                <div id="subtitle-dropdown-list" class="absolute bottom-11 right-0 bg-black/95 border border-outline/30 rounded-xl py-2 shadow-2xl z-30 min-w-[140px] max-h-48 overflow-y-auto flex flex-col gap-1 transition-all opacity-0 pointer-events-none transform translate-y-2 custom-scrollbar">
+                                    <!-- Dinamik doldurulacak -->
+                                </div>
+                            </div>
                             <button id="btn-video-pip" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Picture in Picture">
                                 <span class="material-symbols-outlined">picture_in_picture_alt</span>
                             </button>
