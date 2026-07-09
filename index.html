@@ -304,7 +304,7 @@
                 <video id="main-video-element" class="w-full h-full object-contain"></video>
                 
                 <!-- Custom Controls Overlay -->
-                <div class="video-controls-overlay absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-6 flex flex-col gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" id="video-controls-overlay">
+                <div class="video-controls-overlay absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-6 flex flex-col gap-4 z-10" id="video-controls-overlay">
                     <!-- Timeline Slider -->
                     <div class="video-timeline-wrapper h-4 flex items-center cursor-pointer relative" id="video-timeline-wrapper">
                         <div class="video-timeline-bg w-full h-1 bg-white/20 relative transition-[height] hover:h-1.5" id="video-timeline-bg">
@@ -341,8 +341,11 @@
                             <span id="video-duration">00:00:00</span>
                         </div>
                         
-                        <!-- Right Controls: PiP, Fullscreen -->
+                        <!-- Right Controls: Subtitle, PiP, Fullscreen -->
                         <div class="flex items-center gap-3">
+                            <select id="video-subtitle-select" class="h-9 min-w-[130px] bg-black/40 border border-outline rounded-full px-3 font-mono text-[11px] text-on-surface outline-none" title="Altyazı">
+                                <option value="off">altyazi: kapali</option>
+                            </select>
                             <button id="btn-video-pip" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Picture in Picture">
                                 <span class="material-symbols-outlined">picture_in_picture_alt</span>
                             </button>

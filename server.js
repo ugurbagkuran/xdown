@@ -29,6 +29,8 @@ app.use("/api", (req, res, next) => {
 
 // Global tasks map
 const tasks = new Map();
+const playableConversionTasks = new Map();
+const thumbnailGenerationTasks = new Map();
 
 // Global task queue for download tasks (Max 2 concurrent)
 const taskQueue = [];
@@ -295,14 +297,29 @@ app.get("/api/search", async (req, res) => {
         const ratingM = block.match(/id="imdbp">\s*\(([^)]+)\)/);
 
         if (hrefM && titleM) {
+          const itemUrl = hrefM[1];
+          // Sadece diziyou'nun dizi sayfalarını kabul et.
+          // Filmlerde URL farklı bir kategoriye gider (ör. /film/... veya /category/film/...).
+          const isSeriesUrl =
+            itemUrl.includes("/dizi/") ||
+            itemUrl.includes("/diziler/") ||
+            (itemUrl.includes("diziyou.one") &&
+              !itemUrl.includes("/film/") &&
+              !itemUrl.includes("/category/film/") &&
+              !itemUrl.includes("/kategori/film/") &&
+              !itemUrl.includes("/?s="));
+
+          if (!isSeriesUrl) continue;
+
           const genreM = block.match(/Tür\s*:\s*<\/span>\s*([^<]+)/i) || block.match(/Tür[^:]*:\s*<\/span>\s*([^<]+)/i);
           const genreText = genreM ? genreM[1].toLowerCase() : "";
-          if (genreText.includes("film") || genreText.includes("sinema") || hrefM[1].includes("/film/")) {
+          // Tür alanında "film" veya "sinema" geçiyorsa atla
+          if (genreText.includes("film") || genreText.includes("sinema")) {
             continue;
           }
 
           films.push({
-            url: hrefM[1],
+            url: itemUrl,
             title: titleM[1].trim(),
             poster: posterM ? posterM[1] : null,
             year: null,
@@ -1171,6 +1188,95 @@ function cleanupTaskFiles(tempDir, tsOutputPath, outputPath, options) {
   }
 }
 
+function ensurePlayableCacheDir() {
+  const cacheDir = path.join(process.cwd(), "downloads", ".playable-cache");
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  return cacheDir;
+}
+
+function convertTsToPlayableMp4(inputTsPath, outputMp4Path) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
+        "-fflags", "+genpts",
+        "-i", inputTsPath,
+        "-c", "copy",
+        "-movflags", "+faststart",
+        outputMp4Path,
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+
+    let stderr = "";
+    ffmpeg.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    ffmpeg.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(stderr.trim() || `FFmpeg çıkış kodu: ${code}`));
+    });
+
+    ffmpeg.on("error", (err) => {
+      reject(new Error(`FFmpeg çalıştırılamadı: ${err.message}`));
+    });
+  });
+}
+
+function ensureThumbnailCacheDir() {
+  const cacheDir = path.join(process.cwd(), "downloads", ".thumbnail-cache");
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  return cacheDir;
+}
+
+function generateVideoThumbnail(inputVideoPath, outputImagePath) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
+        "-ss", "00:00:03",
+        "-i", inputVideoPath,
+        "-frames:v", "1",
+        "-q:v", "4",
+        "-vf", "scale=640:-1",
+        outputImagePath,
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+
+    let stderr = "";
+    ffmpeg.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    ffmpeg.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(stderr.trim() || `FFmpeg çıkış kodu: ${code}`));
+    });
+
+    ffmpeg.on("error", (err) => {
+      reject(new Error(`FFmpeg çalıştırılamadı: ${err.message}`));
+    });
+  });
+}
+
 async function runTask(taskId, urls, outputPath, options) {
   const state = tasks.get(taskId);
   const concurrencyLimit = parseInt(options.concurrency || 5, 10);
@@ -1751,6 +1857,190 @@ app.post("/api/task-cancel/:taskId", (req, res) => {
   res.json({ success: true });
 });
 
+function resolveDownloadFilePath(fileParam) {
+  const downloadsDir = path.join(process.cwd(), "downloads");
+  const decoded = decodeURIComponent(String(fileParam || ""));
+  const fileName = path.basename(decoded);
+  const filePath = path.join(downloadsDir, fileName);
+  const relative = path.relative(downloadsDir, filePath);
+  const isSafe = relative && !relative.startsWith("..") && !path.isAbsolute(relative);
+  if (!isSafe) return null;
+  return { downloadsDir, fileName, filePath };
+}
+
+function subtitleLangLabel(lang) {
+  const normalized = String(lang || "").toLowerCase();
+  if (normalized === "tr") return "Turkce";
+  if (normalized === "en") return "English";
+  if (normalized === "de") return "Deutsch";
+  if (normalized === "es") return "Espanol";
+  if (normalized === "fr") return "Francais";
+  return normalized ? normalized.toUpperCase() : "Bilinmeyen";
+}
+
+app.get("/api/video-subtitles", (req, res) => {
+  const resolved = resolveDownloadFilePath(req.query.file);
+  if (!resolved) {
+    return res.status(400).json({ success: false, error: "Gecersiz dosya." });
+  }
+
+  const { downloadsDir, fileName, filePath } = resolved;
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ success: false, error: "Video dosyasi bulunamadi." });
+  }
+
+  const baseName = path.basename(fileName, path.extname(fileName));
+  const prefix = `${baseName}.`;
+
+  let subtitles = [];
+  try {
+    subtitles = fs
+      .readdirSync(downloadsDir)
+      .filter((name) => name.startsWith(prefix) && name.toLowerCase().endsWith(".vtt"))
+      .map((name, index) => {
+        const langPart = name.slice(prefix.length, -4).trim().toLowerCase();
+        const safeLang = langPart || `sub${index + 1}`;
+        return {
+          lang: safeLang,
+          label: subtitleLangLabel(safeLang),
+          file: name,
+          src: `/downloads/${encodeURIComponent(name)}`,
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, "tr"));
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+
+  res.json({ success: true, subtitles });
+});
+
+app.get("/api/video-thumbnail", async (req, res) => {
+  const resolved = resolveDownloadFilePath(req.query.file);
+  if (!resolved) {
+    return res.status(400).json({ success: false, error: "Gecersiz dosya." });
+  }
+
+  const { fileName, filePath } = resolved;
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ success: false, error: "Video dosyasi bulunamadi." });
+  }
+
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext !== ".ts" && ext !== ".mp4") {
+    return res.status(400).json({ success: false, error: "Desteklenmeyen video uzantisi." });
+  }
+
+  const sourceStat = fs.statSync(filePath);
+  const cacheDir = ensureThumbnailCacheDir();
+  const thumbFileName = `${path.basename(fileName, ext)}.jpg`;
+  const thumbPath = path.join(cacheDir, thumbFileName);
+
+  const existingAndFresh =
+    fs.existsSync(thumbPath) &&
+    fs.statSync(thumbPath).isFile() &&
+    fs.statSync(thumbPath).mtimeMs >= sourceStat.mtimeMs;
+
+  if (!existingAndFresh) {
+    const running = thumbnailGenerationTasks.get(filePath);
+    if (running) {
+      try {
+        await running;
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    } else {
+      const thumbnailPromise = generateVideoThumbnail(filePath, thumbPath)
+        .finally(() => {
+          thumbnailGenerationTasks.delete(filePath);
+        });
+      thumbnailGenerationTasks.set(filePath, thumbnailPromise);
+      try {
+        await thumbnailPromise;
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    }
+  }
+
+  if (!fs.existsSync(thumbPath)) {
+    return res.status(500).json({ success: false, error: "Kucuk gorsel olusturulamadi." });
+  }
+
+  res.type("image/jpeg");
+  res.sendFile(thumbPath);
+});
+
+app.get("/api/prepare-video", async (req, res) => {
+  const resolved = resolveDownloadFilePath(req.query.file);
+  if (!resolved) {
+    return res.status(400).json({ success: false, error: "Gecersiz dosya." });
+  }
+
+  const { fileName, filePath } = resolved;
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ success: false, error: "Video dosyasi bulunamadi." });
+  }
+
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext === ".mp4") {
+    return res.json({
+      success: true,
+      url: `/downloads/${encodeURIComponent(fileName)}`,
+      prepared: false,
+      type: "mp4",
+    });
+  }
+
+  if (ext !== ".ts") {
+    return res.status(400).json({ success: false, error: "Desteklenmeyen video uzantisi." });
+  }
+
+  const sourceStat = fs.statSync(filePath);
+  const cacheDir = ensurePlayableCacheDir();
+  const baseName = path.basename(fileName, ".ts");
+  const playableFileName = `${baseName}.playable.mp4`;
+  const playablePath = path.join(cacheDir, playableFileName);
+
+  const existingAndFresh =
+    fs.existsSync(playablePath) &&
+    fs.statSync(playablePath).isFile() &&
+    fs.statSync(playablePath).mtimeMs >= sourceStat.mtimeMs;
+
+  if (!existingAndFresh) {
+    const running = playableConversionTasks.get(filePath);
+    if (running) {
+      try {
+        await running;
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    } else {
+      const conversionPromise = convertTsToPlayableMp4(filePath, playablePath)
+        .finally(() => {
+          playableConversionTasks.delete(filePath);
+        });
+      playableConversionTasks.set(filePath, conversionPromise);
+      try {
+        await conversionPromise;
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    }
+  }
+
+  if (!fs.existsSync(playablePath)) {
+    return res.status(500).json({ success: false, error: "Oynatilabilir video olusturulamadi." });
+  }
+
+  res.json({
+    success: true,
+    url: `/playable-cache/${encodeURIComponent(playableFileName)}`,
+    prepared: true,
+    type: "mp4",
+  });
+});
+
 // 1) List downloaded files (.mp4 and .ts)
 app.get("/api/downloads-list", (req, res) => {
   const downloadsDir = path.join(process.cwd(), "downloads");
@@ -1815,11 +2105,13 @@ app.get("/api/stream-ts", (req, res) => {
   // Spawn ffmpeg to copy ts container into mp4 dynamically
   // -movflags frag_keyframe+empty_moov ensures fragmenting so it can stream without writing full headers at start
   const ffmpeg = spawn("ffmpeg", [
-    "-y",
+    "-hide_banner",
+    "-loglevel", "error",
+    "-fflags", "+genpts",
     "-i", filePath,
     "-c", "copy",
     "-f", "mp4",
-    "-movflags", "frag_keyframe+empty_moov+faststart",
+    "-movflags", "frag_keyframe+empty_moov+default_base_moof",
     "pipe:1"
   ]);
 
@@ -1830,14 +2122,19 @@ app.get("/api/stream-ts", (req, res) => {
     // console.log(`[FFmpeg Stream] ${data.toString()}`);
   });
 
-  // Clean up spawn on connection close or finish
-  req.on("close", () => {
-    ffmpeg.kill("SIGKILL");
+  // İstemci bağlantısı erken kapanırsa ffmpeg'i sonlandır.
+  res.on("close", () => {
+    if (!ffmpeg.killed) {
+      ffmpeg.kill("SIGKILL");
+    }
   });
 
   ffmpeg.on("close", (code) => {
     if (code !== 0 && code !== null) {
       console.error(`[FFmpeg Stream] Process exited with code ${code}`);
+    }
+    if (!res.writableEnded) {
+      res.end();
     }
   });
 
@@ -1851,6 +2148,7 @@ app.get("/api/stream-ts", (req, res) => {
 
 // Serve downloaded files
 app.use("/downloads", express.static(path.join(process.cwd(), "downloads")));
+app.use("/playable-cache", express.static(path.join(process.cwd(), "downloads", ".playable-cache")));
 
 // Export app and a start function for Electron
 export { app };
