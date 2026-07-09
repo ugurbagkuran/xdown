@@ -1,253 +1,361 @@
-<!doctype html>
-<html lang="tr">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>filmdownloader. // decryption_utility</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Anybody:wght@700;800&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600&display=swap"
-            rel="stylesheet"
-        />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-        />
-        <link rel="stylesheet" href="style.css?v=2.0" />
-    </head>
-    <body>
-        <div class="app-container">
-            <header class="app-header" style="display: flex; justify-content: space-between; align-items: center; position: relative;">
-                <div class="logo">
-                    <i class="fa-solid fa-terminal logo-icon"></i>
-                    <h1>filmdownloader.</h1>
-                </div>
-                <div class="download-manager-wrapper" style="position: relative; z-index: 1001;">
-                    <button id="btn-download-manager">
-                        <svg class="download-manager-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                        <span id="download-count-badge" class="download-badge hidden">0</span>
-                    </button>
-                    <!-- Download Manager Popover Dropdown -->
-                    <div id="download-manager-panel" class="download-manager-panel hidden glass">
-                        <div class="dm-header">
-                            <span>aktif_indirmeler.</span>
-                            <button id="btn-clear-dm" class="btn btn-danger btn-small" style="font-size: 10px; padding: 2px 6px;">temizle.</button>
-                        </div>
-                        <div id="dm-tasks-list" class="dm-tasks-list">
-                            <div class="dm-empty">aktif indirme yok.</div>
-                        </div>
-                    </div>
-                </div>
-            </header>
+<!DOCTYPE html>
+<html class="dark" lang="tr">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>filmdownloader. // library_canvas</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="style.css?v=3.0" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-variant": "#343535",
+                      "on-tertiary-fixed-variant": "#00504e",
+                      "background": "#0c0c0c",
+                      "tertiary-fixed-dim": "#7ed5d2",
+                      "on-primary": "#552007",
+                      "on-error": "#690005",
+                      "surface-container-highest": "#343535",
+                      "on-tertiary": "#003736",
+                      "surface-container-high": "#292a2a",
+                      "on-surface-variant": "#d9c2b9",
+                      "surface-tint": "#ffb598",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "on-primary-fixed-variant": "#72361b",
+                      "tertiary-container": "#6fc6c3",
+                      "on-tertiary-container": "#005250",
+                      "surface-bright": "#383939",
+                      "on-secondary-fixed": "#1b1c1c",
+                      "outline-variant": "#333333",
+                      "on-secondary-fixed-variant": "#474746",
+                      "primary-container": "#f8a380",
+                      "on-secondary-container": "#b7b5b4",
+                      "primary-fixed-dim": "#ffb598",
+                      "inverse-on-surface": "#2f3131",
+                      "error-container": "#93000a",
+                      "on-tertiary-fixed": "#00201f",
+                      "surface-container": "#1a1a1a",
+                      "surface-container-lowest": "#0d0e0f",
+                      "inverse-surface": "#e3e2e2",
+                      "on-error-container": "#ffdad6",
+                      "secondary-container": "#262626",
+                      "on-primary-container": "#74371c",
+                      "surface-container-low": "#141414",
+                      "tertiary-fixed": "#9af2ee",
+                      "outline": "#333333",
+                      "on-secondary": "#303030",
+                      "surface-dim": "#0c0c0c",
+                      "secondary": "#c8c6c5",
+                      "on-surface": "#e3e2e2",
+                      "inverse-primary": "#8f4c30",
+                      "primary": "#ffc7b1",
+                      "primary-fixed": "#ffdbce",
+                      "surface": "#121414",
+                      "tertiary": "#8be2df",
+                      "secondary-fixed": "#e4e2e1",
+                      "error": "#ffb4ab",
+                      "on-background": "#e3e2e2",
+                      "on-primary-fixed": "#370e00"
+              },
+              "borderRadius": {
+                      "DEFAULT": "4px",
+                      "sm": "4px",
+                      "md": "6px",
+                      "lg": "8px",
+                      "xl": "12px",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "container-max": "1440px",
+                      "margin-desktop": "48px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "sans": ["Hanken Grotesk", "sans-serif"],
+                      "mono": ["JetBrains Mono", "monospace"]
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-sans antialiased h-screen flex flex-col md:flex-row overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
 
-            <main class="app-content">
-                <!-- ══════════ FİLM ARA PANELİ ══════════ -->
-                <div
-                    id="tab-search"
-                    class="tab-panel active"
-                >
-                    <div class="card glass" style="margin-bottom: 20px">
-                        <div class="card-header">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <h2>otomatik_arama_servisi.</h2>
-                        </div>
-                        <div class="card-body">
-                            <div class="search-type-selector">
-                                <button class="type-btn active" data-type="movie">
-                                    <i class="fa-solid fa-film"></i> film_ara.
-                                </button>
-                                <button class="type-btn" data-type="series">
-                                    <i class="fa-solid fa-tv"></i> dizi_ara.
-                                </button>
-                            </div>
-                            <div class="search-bar">
-                                <input
-                                    type="text"
-                                    id="search-input"
-                                    placeholder="aranacak film adını girin..."
-                                />
-                                <button id="btn-search">
-                                    <i class="fa-solid fa-search"></i> ara.
-                                </button>
-                            </div>
-
-                            <div id="film-grid" class="film-grid">
-                                <div class="search-empty">
-                                    <i
-                                        class="fa-solid fa-terminal"
-                                        style="
-                                            font-size: 32px;
-                                            margin-bottom: 12px;
-                                            display: block;
-                                            opacity: 0.3;
-                                        "
-                                    ></i>
-                                    arama_sorgusu_bekleniyor...
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Otomatik indirme kuyruğu: Gizli tutuluyor, JS referansları için -->
-                    <div id="download-queue" class="hidden"></div>
-                </div>
-
-                <!-- ══════════ İNDİRİLENLER PANELİ ══════════ -->
-                <div id="tab-downloads" class="tab-panel active">
-                    <div class="card glass" style="margin-bottom: 20px; display: flex; flex-direction: column;">
-                        <div class="card-header">
-                            <i class="fa-solid fa-folder-open"></i>
-                            <h2>indirilen_videolar.</h2>
-                        </div>
-                        <div class="card-body" style="flex-grow: 1; display: flex; flex-direction: column; max-height: 480px; overflow-y: auto;">
-                            <div id="downloads-list" class="downloads-list">
-                                <div class="downloads-empty">
-                                    <i class="fa-solid fa-folder-minus" style="font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.3;"></i>
-                                    indirilen video bulunamadı.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
+    <!-- Responsive Shell: Top Nav for Mobile -->
+    <nav id="mobile-nav" class="md:hidden fixed top-0 w-full z-50 bg-surface-container-low border-b border-outline-variant">
+        <div class="flex justify-between items-center px-margin-mobile py-4 w-full">
+            <div class="font-mono text-lg font-bold text-primary-container tracking-tighter">&gt;_ filmdownloader.</div>
+            <div class="flex gap-4">
+                <button id="btn-download-manager-mobile" class="relative text-primary-container hover:opacity-85">
+                    <span class="material-symbols-outlined">download_done</span>
+                    <span id="download-count-badge-mobile" class="absolute -top-1 -right-1 bg-primary-container text-black text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center hidden">0</span>
+                </button>
+            </div>
         </div>
+        <div class="flex px-margin-mobile gap-6 overflow-x-auto border-b border-outline-variant pt-2">
+            <button id="nav-search-mobile" class="nav-tab-btn text-primary-container font-bold border-b-2 border-primary-container pb-2 text-sm whitespace-nowrap" data-tab="tab-search">film_ara.</button>
+            <button id="nav-library-mobile" class="nav-tab-btn text-on-surface-variant font-medium pb-2 text-sm whitespace-nowrap" data-tab="tab-library">kutuphane.</button>
+        </div>
+    </nav>
 
-        <!-- Sezon & Bölüm Seçim Modalı -->
-        <div id="series-modal" class="modal-overlay hidden">
-            <div class="modal-content glass">
-                <div class="modal-header">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="fa-solid fa-tv" style="color: var(--primary); font-size: 1.5rem;"></i>
-                        <h2 id="modal-series-title">dizi_adi.</h2>
-                    </div>
-                    <button id="btn-close-modal" class="btn btn-danger btn-small">
-                        <i class="fa-solid fa-xmark"></i> kapat.
-                    </button>
+    <!-- Responsive Shell: Side Nav for Desktop -->
+    <aside class="hidden md:flex flex-col bg-surface-container-low border-r border-outline-variant h-full w-64 p-gutter gap-4 flex-shrink-0 z-40">
+        <div class="mb-8">
+            <h1 class="font-mono text-lg text-primary-container font-bold">&gt;_ filmdownloader.</h1>
+            <p class="font-mono text-[10px] text-on-surface-variant mt-1">v4.0.2-stable // system_active.</p>
+        </div>
+        <nav class="flex flex-col gap-2 flex-grow">
+            <button id="nav-search" class="nav-tab-btn flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-xl font-bold transition-all text-sm text-left w-full" data-tab="tab-search">
+                <span class="material-symbols-outlined">download</span>
+                film_indirme.
+            </button>
+            <button id="nav-library" class="nav-tab-btn flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all text-sm text-left w-full" data-tab="tab-library">
+                <span class="material-symbols-outlined">movie_filter</span>
+                kutuphane.
+            </button>
+        </nav>
+        
+        <!-- Active Downloads Manager Popover Launcher -->
+        <div class="relative mt-auto">
+            <button id="btn-download-manager" class="w-full py-3 px-4 bg-surface-container border border-outline rounded-xl font-mono text-xs text-on-surface hover:border-primary-container transition-colors flex justify-between items-center">
+                <span class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[16px]">downloading</span> aktif_indirmeler.
+                </span>
+                <span id="download-count-badge" class="bg-primary-container text-black text-[10px] font-bold rounded-full px-1.5 py-0.5 hidden">0</span>
+            </button>
+            
+            <!-- Download Manager Dropdown Panel -->
+            <div id="download-manager-panel" class="absolute bottom-14 left-0 w-72 bg-surface-container border border-outline rounded-xl p-4 hidden shadow-2xl z-50">
+                <div class="flex justify-between items-center border-b border-outline pb-2 mb-3">
+                    <span class="font-mono text-xs text-primary-container">aktif_kuyruk.</span>
+                    <button id="btn-clear-dm" class="text-[10px] text-red-400 hover:underline">temizle.</button>
                 </div>
-                <div class="modal-body">
-                    <div id="modal-seasons-bar" class="seasons-bar">
-                        <!-- Sezon Butonları dinamik eklenecek -->
+                <div id="dm-tasks-list" class="flex flex-col gap-3 max-h-60 overflow-y-auto">
+                    <div class="dm-empty text-center text-xs text-on-surface-variant/50 py-4 font-mono">aktif indirme yok.</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Canvas -->
+    <main class="flex-grow flex flex-col h-full overflow-y-auto relative pt-28 md:pt-0">
+        <!-- Desktop Header -->
+        <header class="hidden md:flex justify-between items-center px-margin-desktop py-6 w-full border-b border-outline/30 sticky top-0 bg-background/95 backdrop-blur-md z-30">
+            <div class="flex items-center gap-3">
+                <span id="header-icon" class="material-symbols-outlined text-[28px] text-primary-container">download</span>
+                <h2 id="header-title" class="font-mono text-xl font-bold text-on-surface">film_indirme.</h2>
+            </div>
+        </header>
+
+        <!-- Dynamic Content Tabs -->
+        <div class="px-margin-mobile md:px-margin-desktop py-6 w-full flex-grow flex flex-col">
+            
+            <!-- ══════════ SEKMELİ 1: FİLM ARA ══════════ -->
+            <div id="tab-search" class="tab-panel flex flex-col gap-6">
+                <!-- Search Section Card -->
+                <div class="bg-surface-container border border-outline rounded-xl p-6 flex flex-col gap-4">
+                    <div class="flex items-center gap-2 border-b border-outline/30 pb-3">
+                        <span class="material-symbols-outlined text-primary-container">search</span>
+                        <h3 class="font-mono text-sm text-on-surface">otomatik_arama_servisi.</h3>
                     </div>
                     
-                    <div id="bulk-download-panel" class="bulk-download-panel hidden">
-                        <div class="bulk-title">
-                            <svg class="download-svg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" style="display:inline-block; vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> sezonu_toplu_indir.
+                    <div class="flex flex-col md:flex-row gap-4 items-center">
+                        <div class="flex bg-surface-container-low border border-outline rounded-full p-1 shrink-0 h-11 items-center">
+                            <button class="type-btn px-4 py-2 rounded-full text-xs font-bold bg-primary-container text-black transition-all" data-type="movie">film_ara.</button>
+                            <button class="type-btn px-4 py-2 rounded-full text-xs font-bold text-on-surface-variant hover:text-on-surface transition-all" data-type="series">dizi_ara.</button>
                         </div>
-                        <div class="bulk-controls">
-                            <div class="control-group">
-                                <label for="bulk-lang">yayın türü:</label>
-                                <select id="bulk-lang" style="padding: 0.4rem 1.6rem 0.4rem 0.8rem;">
-                                    <!-- Dinamik olarak dolacak -->
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <label for="bulk-quality">kalite:</label>
-                                <select id="bulk-quality" style="padding: 0.4rem 1.6rem 0.4rem 0.8rem;">
-                                    <!-- Dinamik olarak dolacak -->
-                                </select>
-                            </div>
-                            <button id="btn-bulk-download" class="btn btn-primary btn-small">
-                                <svg class="download-svg-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" style="display:inline-block; vertical-align:middle; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> sezonu_indir.
+                        
+                        <div class="flex-grow flex w-full gap-2 items-center">
+                            <input type="text" id="search-input" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" data-ms-editor="false" class="flex-grow h-11 bg-surface-container-low border border-outline rounded-full px-5 text-sm text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all placeholder:text-on-surface-variant/40" placeholder="aranacak film adını girin..."/>
+                            <button id="btn-search" class="h-11 px-6 bg-primary-container text-black font-bold rounded-full text-xs hover:bg-primary-fixed transition-colors flex items-center justify-center gap-1.5 shrink-0">
+                                <span class="material-symbols-outlined text-[18px]">search</span> ara.
                             </button>
                         </div>
                     </div>
 
-                    <div id="modal-episodes-list" class="episodes-list">
-                        <!-- Bölümler buraya dinamik eklenecek -->
+                    <!-- Film Grid Arama Sonuçları -->
+                    <div id="film-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mt-4">
+                        <div class="search-empty col-span-full text-center py-12 flex flex-col items-center justify-center gap-3">
+                            <span class="material-symbols-outlined text-4xl text-on-surface-variant/20">terminal</span>
+                            <span class="font-mono text-xs text-on-surface-variant/50">arama_sorgusu_bekleniyor...</span>
+                        </div>
                     </div>
                 </div>
+                
+                <!-- Otomatik indirme kuyruğu (Gizli tutuluyor, JS referansları için) -->
+                <div id="download-queue" class="hidden"></div>
             </div>
-        </div>
 
-        <!-- Custom Confirm Modal Overlay -->
-        <div id="custom-confirm-modal" class="modal-overlay hidden" style="z-index: 2000;">
-            <div class="modal-content" style="max-width: 450px; padding: 20px; text-transform: lowercase; gap: 16px; border: 2px solid var(--primary); background: var(--bg-card); position: relative;">
-                <div class="modal-header" style="border-bottom: 1px solid var(--outline); padding-bottom: 10px;">
-                    <h2 style="font-family:'Space Grotesk', sans-serif; font-size: 1.15rem; color: var(--primary); margin:0;"><i class="fa-solid fa-triangle-exclamation"></i> sistem_onayi.</h2>
-                </div>
-                <div class="modal-body" style="font-size: 0.9rem; color: var(--text-main); line-height: 1.4; padding: 5px 0;">
-                    <p id="custom-confirm-text" style="margin: 0;"></p>
-                </div>
-                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--outline); padding-top: 12px;">
-                    <button id="btn-confirm-yes" class="btn btn-primary btn-small">tamam.</button>
-                    <button id="btn-confirm-no" class="btn btn-danger btn-small">iptal.</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Video Player Modal Overlay -->
-        <div id="video-player-modal" class="modal-overlay hidden" style="z-index: 2100;">
-            <div class="video-player-content glass" style="max-width: 960px; width: 90%; background: var(--bg-card); border: 2px solid var(--primary); padding: 0; display: flex; flex-direction: column; position: relative;">
-                <div class="modal-header" style="padding: 12px 20px; border-bottom: 1px solid var(--outline); display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; white-space: nowrap;">
-                        <i class="fa-solid fa-circle-play" style="color: var(--primary); font-size: 1.2rem;"></i>
-                        <h2 id="video-player-title" style="font-size: 1rem; margin: 0; text-transform: lowercase; text-overflow: ellipsis; overflow: hidden;">video_oynatici.</h2>
+            <!-- ══════════ SEKMELİ 2: KÜTÜPHANE ══════════ -->
+            <div id="tab-library" class="tab-panel hidden flex flex-col gap-6">
+                <!-- Library Filter Header -->
+                <div class="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                    <!-- Technical Search -->
+                    <div class="relative w-full sm:w-80 group">
+                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary-container transition-colors">search</span>
+                        <input id="library-search-input" class="w-full bg-surface-container border border-outline rounded-lg py-2.5 pl-12 pr-4 text-xs text-on-surface font-mono focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all placeholder:text-on-surface-variant/40" placeholder="kütüphanede_ara." type="text"/>
                     </div>
-                    <button id="btn-close-video" class="btn btn-danger btn-small">
-                        <i class="fa-solid fa-xmark"></i> kapat.
-                    </button>
-                </div>
-                <div class="video-player-body" style="background: #000; position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16/9; overflow: hidden;">
-                    <video id="main-video-element" style="width: 100%; height: 100%; object-fit: contain;"></video>
                     
-                    <!-- Custom Controls Overlay -->
-                    <div class="video-controls-overlay" id="video-controls-overlay">
-                        <!-- Timeline Slider -->
-                        <div class="video-timeline-wrapper" id="video-timeline-wrapper">
-                            <div class="video-timeline-bg" id="video-timeline-bg">
-                                <div class="video-timeline-fill" id="video-timeline-fill"></div>
-                                <div class="video-timeline-handle" id="video-timeline-handle"></div>
+                    <!-- Quick Stats -->
+                    <div class="flex gap-4 font-mono text-[10px] text-on-surface-variant">
+                        <span>toplam: <strong id="library-total-count" class="text-primary-container">0</strong></span>
+                    </div>
+                </div>
+
+                <!-- Library Grid -->
+                <div id="library-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                    <div class="library-empty col-span-full text-center py-16 border border-dashed border-outline rounded-xl flex flex-col items-center justify-center gap-3">
+                        <span class="material-symbols-outlined text-4xl text-on-surface-variant/20">folder_open</span>
+                        <span class="font-mono text-xs text-on-surface-variant/50">indirilen film bulunamadı.</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Sezon & Bölüm Seçim Modalı -->
+    <div id="series-modal" class="modal-overlay hidden">
+        <div class="modal-content glass max-w-2xl w-full bg-surface-container border-2 border-primary-container p-6 rounded-xl flex flex-col gap-6 shadow-2xl">
+            <div class="modal-header flex justify-between items-center border-b border-outline pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary-container">tv</span>
+                    <h2 id="modal-series-title" class="font-mono text-sm font-bold text-on-surface">dizi_adi.</h2>
+                </div>
+                <button id="btn-close-modal" class="px-4 py-1.5 bg-red-950/40 text-red-400 border border-red-500/30 rounded-full text-xs font-bold hover:bg-red-900/60 transition-colors">
+                    kapat.
+                </button>
+            </div>
+            <div class="modal-body flex flex-col gap-4">
+                <div id="modal-seasons-bar" class="seasons-bar flex gap-2 overflow-x-auto pb-2">
+                    <!-- Sezon Butonları -->
+                </div>
+                
+                <div id="bulk-download-panel" class="bulk-download-panel bg-surface-container-low border border-outline rounded-xl p-4 hidden flex-col gap-3">
+                    <div class="bulk-title font-mono text-xs text-primary-container flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px]">download_done</span> sezonu_toplu_indir.
+                    </div>
+                    <div class="bulk-controls flex flex-wrap gap-4 items-center">
+                        <div class="control-group flex items-center gap-2">
+                            <label for="bulk-lang" class="font-mono text-[10px] text-on-surface-variant">yayın:</label>
+                            <select id="bulk-lang" class="bg-surface-container border border-outline rounded px-2 py-1 text-xs text-on-surface outline-none">
+                            </select>
+                        </div>
+                        <div class="control-group flex items-center gap-2">
+                            <label for="bulk-quality" class="font-mono text-[10px] text-on-surface-variant">kalite:</label>
+                            <select id="bulk-quality" class="bg-surface-container border border-outline rounded px-2 py-1 text-xs text-on-surface outline-none">
+                            </select>
+                        </div>
+                        <button id="btn-bulk-download" class="ml-auto px-4 py-1.5 bg-primary-container text-black font-bold rounded-full text-xs hover:bg-primary-fixed transition-colors">
+                            sezonu_indir.
+                        </button>
+                    </div>
+                </div>
+
+                <div id="modal-episodes-list" class="episodes-list max-h-80 overflow-y-auto flex flex-col gap-2 pr-1">
+                    <!-- Bölümler -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal Overlay -->
+    <div id="custom-confirm-modal" class="modal-overlay hidden" style="z-index: 2000;">
+        <div class="modal-content max-w-sm w-full p-6 bg-surface-container border-2 border-primary-container rounded-xl flex flex-col gap-4 shadow-2xl relative">
+            <div class="modal-header border-b border-outline pb-3">
+                <h2 class="font-mono text-sm text-primary-container font-bold flex items-center gap-2"><span class="material-symbols-outlined text-[18px]">warning</span> sistem_onayi.</h2>
+            </div>
+            <div class="modal-body text-xs text-on-surface-variant leading-relaxed py-2">
+                <p id="custom-confirm-text"></p>
+            </div>
+            <div class="modal-footer flex justify-end gap-3 border-t border-outline pt-3">
+                <button id="btn-confirm-yes" class="px-4 py-1.5 bg-primary-container text-black font-bold rounded-full text-xs hover:bg-primary-fixed transition-colors">tamam.</button>
+                <button id="btn-confirm-no" class="px-4 py-1.5 bg-surface-container-highest text-on-surface border border-outline rounded-full text-xs hover:bg-surface-variant transition-colors">iptal.</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Player Modal Overlay -->
+    <div id="video-player-modal" class="modal-overlay hidden" style="z-index: 2100;">
+        <div class="video-player-content max-w-5xl w-[90%] bg-black border-2 border-primary-container rounded-xl overflow-hidden flex flex-col shadow-2xl relative">
+            <!-- Modal Header -->
+            <div class="modal-header flex justify-between items-center bg-surface-container px-6 py-4 border-b border-outline">
+                <div class="flex items-center gap-2 overflow-hidden mr-4">
+                    <span class="material-symbols-outlined text-primary-container">movie</span>
+                    <h2 id="video-player-title" class="font-mono text-xs text-on-surface truncate">video_oynatici.</h2>
+                </div>
+                <button id="btn-close-video" class="px-4 py-1.5 bg-red-950/40 text-red-400 border border-red-500/30 rounded-full text-xs font-bold hover:bg-red-900/60 transition-colors flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">close</span> kapat.
+                </button>
+            </div>
+            
+            <!-- Video Container -->
+            <div class="video-player-body relative aspect-video flex items-center justify-center group overflow-hidden bg-black">
+                <video id="main-video-element" class="w-full h-full object-contain"></video>
+                
+                <!-- Custom Controls Overlay -->
+                <div class="video-controls-overlay absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-6 flex flex-col gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10" id="video-controls-overlay">
+                    <!-- Timeline Slider -->
+                    <div class="video-timeline-wrapper h-4 flex items-center cursor-pointer relative" id="video-timeline-wrapper">
+                        <div class="video-timeline-bg w-full h-1 bg-white/20 relative transition-[height] hover:h-1.5" id="video-timeline-bg">
+                            <div class="video-timeline-fill h-full bg-primary-container w-0 absolute left-0 top-0" id="video-timeline-fill"></div>
+                            <div class="video-timeline-handle w-3 h-3 bg-white border border-primary-container absolute top-1/2 -translate-y-1/2 -translate-x-1/2 hidden group-hover:block rounded-full" id="video-timeline-handle"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <!-- Left Controls: Play, Rewind, Forward, Volume -->
+                        <div class="flex items-center gap-4">
+                            <button id="btn-video-play" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Oynat/Duraklat (Space)">
+                                <span class="material-symbols-outlined">play_arrow</span>
+                            </button>
+                            <button id="btn-video-rewind" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="10 Saniye Geri (Sol Yön Tuşu)">
+                                <span class="material-symbols-outlined">replay_10</span>
+                            </button>
+                            <button id="btn-video-forward" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="10 Saniye İleri (Sağ Yön Tuşu)">
+                                <span class="material-symbols-outlined">forward_10</span>
+                            </button>
+                            
+                            <div class="flex items-center gap-2 group/volume ml-2">
+                                <button id="btn-video-mute" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Sessiz">
+                                    <span class="material-symbols-outlined">volume_up</span>
+                                </button>
+                                <input type="range" id="video-volume-slider" min="0" max="1" step="0.05" value="1" class="w-16 h-1 bg-white/20 rounded-full outline-none appearance-none cursor-pointer accent-primary-container transition-all group-hover/volume:w-20"/>
                             </div>
                         </div>
                         
-                        <div class="video-controls-row">
-                            <!-- Left Controls: Play, Back, Forward, Volume -->
-                            <div class="controls-left">
-                                <button id="btn-video-play" class="control-btn" title="Oynat/Duraklat (Space)">
-                                    <i class="fa-solid fa-play"></i>
-                                </button>
-                                <button id="btn-video-rewind" class="control-btn" title="10 Saniye Geri (Sol Yön Tuşu)">
-                                    <i class="fa-solid fa-backward"></i>
-                                </button>
-                                <button id="btn-video-forward" class="control-btn" title="10 Saniye İleri (Sağ Yön Tuşu)">
-                                    <i class="fa-solid fa-forward"></i>
-                                </button>
-                                
-                                <div class="video-volume-wrapper">
-                                    <button id="btn-video-mute" class="control-btn" title="Sessiz">
-                                        <i class="fa-solid fa-volume-high"></i>
-                                    </button>
-                                    <input type="range" id="video-volume-slider" min="0" max="1" step="0.05" value="1">
-                                </div>
-                            </div>
-                            
-                            <!-- Center: Time Display -->
-                            <div class="controls-center font-code">
-                                <span id="video-current-time">00:00:00</span>
-                                <span class="separator" style="color: var(--text-muted); margin: 0 4px;">/</span>
-                                <span id="video-duration">00:00:00</span>
-                            </div>
-                            
-                            <!-- Right Controls: Picture-in-Picture, Fullscreen -->
-                            <div class="controls-right">
-                                <button id="btn-video-pip" class="control-btn" title="Picture in Picture">
-                                    <i class="fa-solid fa-window-restore"></i>
-                                </button>
-                                <button id="btn-video-fullscreen" class="control-btn" title="Tam Ekran (F)">
-                                    <i class="fa-solid fa-expand"></i>
-                                </button>
-                            </div>
+                        <!-- Center Time Display -->
+                        <div class="font-mono text-xs text-on-surface flex items-center gap-1.5">
+                            <span id="video-current-time">00:00:00</span>
+                            <span class="text-on-surface-variant/40">/</span>
+                            <span id="video-duration">00:00:00</span>
+                        </div>
+                        
+                        <!-- Right Controls: PiP, Fullscreen -->
+                        <div class="flex items-center gap-3">
+                            <button id="btn-video-pip" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Picture in Picture">
+                                <span class="material-symbols-outlined">picture_in_picture_alt</span>
+                            </button>
+                            <button id="btn-video-fullscreen" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Tam Ekran (F)">
+                                <span class="material-symbols-outlined">fullscreen</span>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <footer class="app-footer">
-            <p>filmdownloader_v1.0.0 // system_active.</p>
-        </footer>
-
-        <script src="app.js?v=2.0" type="module"></script>
-    </body>
+    <script src="app.js?v=3.0" type="module"></script>
+</body>
 </html>

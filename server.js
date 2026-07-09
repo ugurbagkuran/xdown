@@ -62,7 +62,7 @@ function processTaskQueue() {
 
 // Keep-alive agents for connection reuse across segments
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 32 });
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 32 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 32, rejectUnauthorized: false });
 
 // Helper to download a file to a buffer with default browser headers
 function fetchContentLength(url, headers = {}, redirectCount = 0) {
@@ -194,7 +194,7 @@ function scheduleTaskCleanup(taskId, delayMs = 10 * 60 * 1000) {
   }, delayMs).unref?.();
 }
 
-function fetchBuffer(url, headers = {}, redirectCount = 0) {
+function fetchBuffer(url, headers = {}, redirectCount = 0, timeout = 12000) {
   return new Promise((resolve, reject) => {
     if (redirectCount > 5)
       return reject(new Error("Çok fazla yönlendirme (Redirect loop)"));
@@ -224,7 +224,7 @@ function fetchBuffer(url, headers = {}, redirectCount = 0) {
       const agent = isHttps ? httpsAgent : httpAgent;
       const req = client.get(
         url,
-        { headers: defaultHeaders, agent, timeout: 12000 },
+        { headers: defaultHeaders, agent, timeout },
         (res) => {
           // Handle redirects
           if (
@@ -233,7 +233,7 @@ function fetchBuffer(url, headers = {}, redirectCount = 0) {
           ) {
             res.resume(); // drain to free socket
             const redirectUrl = new URL(res.headers.location, url).toString();
-            return fetchBuffer(redirectUrl, headers, redirectCount + 1)
+            return fetchBuffer(redirectUrl, headers, redirectCount + 1, timeout)
               .then(resolve)
               .catch(reject);
           }
@@ -252,7 +252,7 @@ function fetchBuffer(url, headers = {}, redirectCount = 0) {
       );
       req.on("timeout", () => {
         req.destroy();
-        reject(new Error("Bağlantı zaman aşımı (12s)"));
+        reject(new Error(`Bağlantı zaman aşımı (${Math.round(timeout / 1000)}s)`));
       });
       req.on("error", (err) => reject(err));
     } catch (e) {
@@ -280,7 +280,7 @@ app.get("/api/search", async (req, res) => {
       const searchUrl = `https://www.diziyou.one/?s=${encodeURIComponent(q)}`;
       const buf = await fetchBuffer(searchUrl, {
         Referer: "https://www.diziyou.one/",
-      });
+      }, 0, 4000);
       const html = buf.toString("utf-8");
       const films = [];
       const blocks = html.split('class="cat-img"').slice(1);
@@ -295,6 +295,12 @@ app.get("/api/search", async (req, res) => {
         const ratingM = block.match(/id="imdbp">\s*\(([^)]+)\)/);
 
         if (hrefM && titleM) {
+          const genreM = block.match(/Tür\s*:\s*<\/span>\s*([^<]+)/i) || block.match(/Tür[^:]*:\s*<\/span>\s*([^<]+)/i);
+          const genreText = genreM ? genreM[1].toLowerCase() : "";
+          if (genreText.includes("film") || genreText.includes("sinema") || hrefM[1].includes("/film/")) {
+            continue;
+          }
+
           films.push({
             url: hrefM[1],
             title: titleM[1].trim(),
@@ -314,7 +320,7 @@ app.get("/api/search", async (req, res) => {
       const searchUrl = `https://www.fullhdfilmizle.mom/?s=${encodeURIComponent(q)}`;
       const buf = await fetchBuffer(searchUrl, {
         Referer: "https://www.fullhdfilmizle.mom/",
-      });
+      }, 0, 4000);
       const html = buf.toString("utf-8");
       const films = [];
       const blocks = html.split('<div class="movie-box">').slice(1);

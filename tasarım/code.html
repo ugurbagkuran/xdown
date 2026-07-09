@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="tr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FilmDownloader - Kütüphane</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-variant": "#343535",
+                      "on-tertiary-fixed-variant": "#00504e",
+                      "background": "#121414",
+                      "tertiary-fixed-dim": "#7ed5d2",
+                      "on-primary": "#552007",
+                      "on-error": "#690005",
+                      "surface-container-highest": "#343535",
+                      "on-tertiary": "#003736",
+                      "surface-container-high": "#292a2a",
+                      "on-surface-variant": "#d9c2b9",
+                      "surface-tint": "#ffb598",
+                      "secondary-fixed-dim": "#c8c6c5",
+                      "on-primary-fixed-variant": "#72361b",
+                      "tertiary-container": "#6fc6c3",
+                      "on-tertiary-container": "#005250",
+                      "surface-bright": "#383939",
+                      "on-secondary-fixed": "#1b1c1c",
+                      "outline-variant": "#53433d",
+                      "on-secondary-fixed-variant": "#474746",
+                      "primary-container": "#f8a380",
+                      "on-secondary-container": "#b7b5b4",
+                      "primary-fixed-dim": "#ffb598",
+                      "inverse-on-surface": "#2f3131",
+                      "error-container": "#93000a",
+                      "on-tertiary-fixed": "#00201f",
+                      "surface-container": "#1e2020",
+                      "surface-container-lowest": "#0d0e0f",
+                      "inverse-surface": "#e3e2e2",
+                      "on-error-container": "#ffdad6",
+                      "secondary-container": "#474746",
+                      "on-primary-container": "#74371c",
+                      "surface-container-low": "#1a1c1c",
+                      "tertiary-fixed": "#9af2ee",
+                      "outline": "#a18c85",
+                      "on-secondary": "#303030",
+                      "surface-dim": "#121414",
+                      "secondary": "#c8c6c5",
+                      "on-surface": "#e3e2e2",
+                      "inverse-primary": "#8f4c30",
+                      "primary": "#ffc7b1",
+                      "primary-fixed": "#ffdbce",
+                      "surface": "#121414",
+                      "tertiary": "#8be2df",
+                      "secondary-fixed": "#e4e2e1",
+                      "error": "#ffb4ab",
+                      "on-background": "#e3e2e2",
+                      "on-primary-fixed": "#370e00"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "container-max": "1440px",
+                      "margin-desktop": "48px",
+                      "margin-mobile": "16px"
+              },
+              "fontFamily": {
+                      "headline-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "code-md": [
+                              "JetBrains Mono"
+                      ],
+                      "label-caps": [
+                              "JetBrains Mono"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-lg": [
+                              "JetBrains Mono"
+                      ],
+                      "body-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "headline-sm": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "code-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        /* Custom scrollbar for technical feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121414;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #343535;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #53433d;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-lg text-body-lg antialiased h-screen flex overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- Responsive Shell: Top Nav for Mobile -->
+<nav class="md:hidden fixed top-0 w-full z-50 bg-surface-container-low border-b border-outline-variant">
+<div class="flex justify-between items-center px-margin-mobile py-4 w-full">
+<div class="font-code-md text-headline-sm font-bold text-primary tracking-tighter">&gt;_ filmdownloader.</div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary cursor-pointer hover:opacity-80 transition-opacity">download_done</span>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:opacity-80 transition-opacity">account_circle</span>
+</div>
+</div>
+<div class="flex px-margin-mobile gap-6 overflow-x-auto border-b border-outline-variant pt-2">
+<a class="text-on-surface-variant font-medium pb-1 font-headline-md text-headline-md whitespace-nowrap" href="#">İndirmeler</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-headline-md text-headline-md whitespace-nowrap" href="#">Kütüphane</a>
+<a class="text-on-surface-variant font-medium pb-1 font-headline-md text-headline-md whitespace-nowrap" href="#">Ayarlar</a>
+</div>
+</nav>
+<!-- Responsive Shell: Side Nav for Desktop -->
+<aside class="hidden md:flex flex-col bg-surface-container-low border-r border-outline-variant h-full w-64 p-gutter gap-4 flex-shrink-0 z-40">
+<div class="mb-8">
+<h1 class="font-code-md text-headline-sm text-primary">&gt;_ filmdownloader.</h1>
+<p class="font-label-caps text-label-caps text-on-surface-variant mt-1">v4.0.2-stable</p>
+</div>
+<nav class="flex flex-col gap-2 flex-grow">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined">download</span>
+                Film İndirme
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-xl font-bold font-body-lg text-body-lg scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">movie_filter</span>
+                Kütüphane
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+                İstatistikler
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined">terminal</span>
+                Terminal
+            </a>
+</nav>
+<button class="mt-auto w-full py-3 px-4 bg-primary-container text-on-primary-container rounded-full font-label-caps text-label-caps hover:bg-primary-fixed transition-colors flex justify-center items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span> Yeni Görev Başlat
+        </button>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col h-full overflow-y-auto relative pt-24 md:pt-0">
+<!-- Desktop Header Anchor (optional supplementary to SideNav) -->
+<header class="hidden md:flex justify-between items-center px-margin-desktop py-6 w-full max-w-container-max mx-auto border-b border-outline-variant/30 sticky top-0 bg-background/90 backdrop-blur-md z-30">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[32px] text-primary-container">movie_filter</span>
+<h2 class="font-display-lg text-display-lg text-on-surface">Kütüphane_</h2>
+</div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary-container cursor-pointer hover:opacity-80 transition-opacity">download_done</span>
+<span class="material-symbols-outlined text-primary-container cursor-pointer hover:opacity-80 transition-opacity">account_circle</span>
+</div>
+</header>
+<div class="px-margin-mobile md:px-margin-desktop py-8 w-full max-w-container-max mx-auto flex flex-col gap-8">
+<!-- Technical Control Row: Search & Filters -->
+<div class="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+<!-- Terminal Style Search Bar -->
+<div class="relative w-full md:w-96 group">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary-container transition-colors">search</span>
+<input class="w-full bg-surface-container-low border border-outline-variant rounded-lg py-3 pl-12 pr-4 text-on-surface font-code-md text-code-md focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all placeholder:text-on-surface-variant/50" placeholder="kütüphanede_ara." type="text"/>
+<div class="absolute right-4 top-1/2 -translate-y-1/2 hidden group-focus-within:block w-2 h-4 bg-primary-container animate-pulse"></div>
+</div>
+<!-- Filter Chips -->
+<div class="flex gap-3 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto hide-scrollbar">
+<button class="px-5 py-2 rounded-full bg-primary-container text-on-primary-container font-label-caps text-label-caps whitespace-nowrap border border-primary-container shadow-[0_0_10px_rgba(248,163,128,0.2)]">Hepsi.</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-highest text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors font-label-caps text-label-caps whitespace-nowrap border border-outline-variant">İndirilenler.</button>
+<button class="px-5 py-2 rounded-full bg-surface-container-highest text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors font-label-caps text-label-caps whitespace-nowrap border border-outline-variant">İzleme Listesi.</button>
+</div>
+</div>
+<!-- Bento/Grid Library View -->
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-gutter md:gap-6 mt-4">
+<!-- Card 1: Inception -->
+<div class="group flex flex-col gap-3 cursor-pointer">
+<div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high border border-outline-variant/50 group-hover:border-primary-container/50 transition-colors">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A highly detailed cinematic poster for a sci-fi heist movie. The scene features a man standing on a city street that is physically bending upwards into the sky, creating a surreal, gravity-defying architectural marvel. The color palette is composed of cool steel blues, concrete greys, and stark shadows, emphasizing a sleek, technical, and slightly dystopian atmosphere. Bright, dramatic lighting highlights the impossible geometry." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYzTqYetyH4jYEkXJI6xhuCiu-2bVDLNtFTMYnDrdfFtludlLryN7VdBTXDf_pHYZ1Nwc0i-NOyr2nfyujX5aMIgcEzLdfzg1K31GLljhCKyuHOoVy__aJoAYnjKV6s_FANH2XAXQ41Q53R8gEjg7KpwwR78yr28PJnYL6ccZUG_Vrger8BQHTEWlQGedZJuS1ap7CD1TCUziI--rN_ie8cXHE9GO16ASXzdeAgs7BrV1XO3_mA9tC1UNJJl7l1Jaw656ZjkGECi7g"/>
+<!-- Status Badge -->
+<div class="absolute top-3 right-3 bg-surface-container/90 backdrop-blur-sm border border-outline-variant px-2 py-1 rounded font-label-caps text-[10px] text-tertiary">4K HEVC</div>
+<!-- Gradient Overlay -->
+<div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+<!-- Info on Hover -->
+<div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+<span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+</div>
+<div class="flex flex-col px-1">
+<h3 class="font-headline-sm text-headline-sm text-on-surface truncate group-hover:text-primary-container transition-colors">Inception</h3>
+<div class="flex justify-between items-center mt-1">
+<span class="font-code-md text-code-md text-on-surface-variant/70 text-xs">2010 • 2h 28m</span>
+<div class="flex items-center gap-1 text-primary-container text-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span> <span class="font-code-md text-xs">4.8</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 2: Interstellar -->
+<div class="group flex flex-col gap-3 cursor-pointer">
+<div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high border border-outline-variant/50 group-hover:border-primary-container/50 transition-colors">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A breathtaking deep space poster depicting a lone astronaut walking on a stark, icy planet surface. In the background, a massive, glowing black hole dominates the starry void, bending light around its edges. The color palette is dark and moody, featuring deep blacks, stark whites from the ice, and intense golden and amber hues emanating from the accretion disk of the black hole. High contrast and cinematic lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBXCvEqRGNmH2vRatZxxC7klYAA2MtlMwe6JsRbPwRDD-KRQ4hN89rTt_135yuyOUAARqFm2noGGj6YrhXA5iLjOBVK7BjCOBRaXmq0ifklaIVP36XzHEVPT9G2pYLct0ZW2KYp4QRY0aW8ZeF4o0Fjm6qJ2dMkSwcZmYOsvbzdztbLuYCNLgwbZ1_Gilpfayj1NiGT4I9v7Fh4AR-RY0T71m5vh_lRoRsyFvPM2reWOekl-VSeJd5y_EolEAdAAMpGknVY0J2aWPMe"/>
+<div class="absolute top-3 right-3 bg-surface-container/90 backdrop-blur-sm border border-outline-variant px-2 py-1 rounded font-label-caps text-[10px] text-tertiary">1080p HDR</div>
+<div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+<div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+<span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+</div>
+<div class="flex flex-col px-1">
+<h3 class="font-headline-sm text-headline-sm text-on-surface truncate group-hover:text-primary-container transition-colors">Interstellar</h3>
+<div class="flex justify-between items-center mt-1">
+<span class="font-code-md text-code-md text-on-surface-variant/70 text-xs">2014 • 2h 49m</span>
+<div class="flex items-center gap-1 text-primary-container text-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span> <span class="font-code-md text-xs">4.9</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 3: The Dark Knight -->
+<div class="group flex flex-col gap-3 cursor-pointer">
+<div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high border border-outline-variant/50 group-hover:border-primary-container/50 transition-colors">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 filter grayscale-[20%]" data-alt="A gritty, urban cinematic poster featuring a vigilante figure standing atop a skyscraper at night. The city below is ablaze with chaotic, fiery explosions. The dominant colors are inky blacks, deep charcoal greys, and violent bursts of orange and yellow fire. The lighting is harsh and dramatic, emphasizing the dark, brooding atmosphere of a corrupt metropolis teetering on the edge of destruction." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDo4c-LLgSJt_2Zr-hVUd7rIzeJCuP-rwiu9EX-baa-85rhAWbbx46HApw91Q_jFk6mWLeNgDjNk8GUIfdZvh4jBVD3itlhfCNWflAjvQX_aIVO1tqbqeLSbaXRgTbnWnGzgSGn3ktsRhxgE_mik8TK9G-NxxhMmZNNOxJ39Go4WEmlQGJs7oY0KLfRw1OJKQhFd1QE5XxRE06vx5GknFb_3juyYbiFQYC5f-Kb5jgAFq3p2VrW0x8oNP7o_lbiNNEkBV-lt3bSWtb"/>
+<div class="absolute top-3 right-3 bg-surface-container/90 backdrop-blur-sm border border-outline-variant px-2 py-1 rounded font-label-caps text-[10px] text-tertiary">4K REMUX</div>
+<div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+<div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+<span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+</div>
+<div class="flex flex-col px-1">
+<h3 class="font-headline-sm text-headline-sm text-on-surface truncate group-hover:text-primary-container transition-colors">The Dark Knight</h3>
+<div class="flex justify-between items-center mt-1">
+<span class="font-code-md text-code-md text-on-surface-variant/70 text-xs">2008 • 2h 32m</span>
+<div class="flex items-center gap-1 text-primary-container text-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span> <span class="font-code-md text-xs">5.0</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 4: Blade Runner 2049 -->
+<div class="group flex flex-col gap-3 cursor-pointer">
+<div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container-high border border-outline-variant/50 group-hover:border-primary-container/50 transition-colors">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A stunning cyberpunk cinematic poster. A solitary figure stands in a desolate, foggy landscape tinged entirely in vibrant, toxic orange and amber hues. Ruined, colossal statues or structures fade into the thick atmospheric smog. The visual style is highly stylized, moody, and deeply atmospheric, relying on a monochromatic orange palette with heavy shadowing to convey a sense of isolation and high-tech decay." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCN-G0LcIuqjtLlaf-rPYOxpRqD9-G_2D0K-RswyPYsMH_37Kp2xjsjPyVH47ZaQlAXJAJX4Q2A_eJkh35aSmzvvPZVmv8C5M97x7vHOoFW8_1hW1hbSUquQUB6o-ocDRfYqPskS92DiiU5bWoqcnb31HUxjr9FwUGZdfh49Wza8AG4nACu6DQfhNiwuTR4Vtjcztbpz2ELE70WPKwevoJw0zwq5MvS3dyFhZEqSb6IxqgOiBDRrCwDCof8jjygM5jqixsj0sR_pvMq"/>
+<div class="absolute top-3 right-3 bg-surface-container/90 backdrop-blur-sm border border-outline-variant px-2 py-1 rounded font-label-caps text-[10px] text-on-surface-variant">DOWNLOADING...</div>
+<!-- Progress Bar Overlay -->
+<div class="absolute bottom-0 left-0 w-full h-1 bg-surface-variant z-10">
+<div class="h-full bg-primary-container w-[65%]"></div>
+</div>
+<div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+</div>
+<div class="flex flex-col px-1">
+<h3 class="font-headline-sm text-headline-sm text-on-surface truncate group-hover:text-primary-container transition-colors">Blade Runner 2049</h3>
+<div class="flex justify-between items-center mt-1">
+<span class="font-code-md text-code-md text-primary-container/80 text-xs animate-pulse">65% • 12.4 MB/s</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple script to hide/show terminal cursor pulse on input focus
+        const searchInput = document.querySelector('input[type="text"]');
+        if(searchInput) {
+            searchInput.addEventListener('focus', function() {
+                this.placeholder = '';
+            });
+            searchInput.addEventListener('blur', function() {
+                if(this.value === '') {
+                    this.placeholder = 'kütüphanede_ara.';
+                }
+            });
+        }
+    </script>
+</body></html>

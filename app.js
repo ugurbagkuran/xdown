@@ -95,10 +95,10 @@ let taskCounter = 0; // Technical process counter for PROC_XXX IDs
 // ── Search Type Selector Logic ──────────────────────────────────────────────
 document.querySelectorAll(".type-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document
-      .querySelectorAll(".type-btn")
-      .forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
+    document.querySelectorAll(".type-btn").forEach((b) => {
+      b.className = "type-btn px-4 py-2 rounded-full text-xs font-bold text-on-surface-variant hover:text-on-surface transition-all";
+    });
+    btn.className = "type-btn px-4 py-2 rounded-full text-xs font-bold bg-primary-container text-black transition-all";
     activeSearchType = btn.dataset.type;
 
     if (activeSearchType === "series") {
@@ -109,6 +109,59 @@ document.querySelectorAll(".type-btn").forEach((btn) => {
     }
   });
 });
+
+// ─── TAB MANAGEMENT ─────────────────────────────────────────────────────────
+const tabPanels = document.querySelectorAll(".tab-panel");
+const desktopNavBtns = document.querySelectorAll("aside button[data-tab]");
+const mobileNavBtns = document.querySelectorAll("#mobile-nav button[data-tab]");
+const elHeaderTitle = document.getElementById("header-title");
+const elHeaderIcon = document.getElementById("header-icon");
+
+function switchTab(tabId) {
+  tabPanels.forEach(p => p.classList.add("hidden"));
+  const activePanel = document.getElementById(tabId);
+  if (activePanel) activePanel.classList.remove("hidden");
+
+  desktopNavBtns.forEach(btn => {
+    if (btn.dataset.tab === tabId) {
+      btn.className = "nav-tab-btn flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-xl font-bold transition-all text-sm text-left w-full scale-95 duration-150";
+    } else {
+      btn.className = "nav-tab-btn flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all text-sm text-left w-full";
+    }
+  });
+
+  mobileNavBtns.forEach(btn => {
+    if (btn.dataset.tab === tabId) {
+      btn.className = "nav-tab-btn text-primary-container font-bold border-b-2 border-primary-container pb-2 text-sm whitespace-nowrap";
+    } else {
+      btn.className = "nav-tab-btn text-on-surface-variant font-medium pb-2 text-sm whitespace-nowrap";
+    }
+  });
+
+  if (tabId === "tab-search") {
+    if (elHeaderTitle) elHeaderTitle.textContent = "film_indirme.";
+    if (elHeaderIcon) elHeaderIcon.textContent = "download";
+  } else if (tabId === "tab-library") {
+    if (elHeaderTitle) elHeaderTitle.textContent = "kütüphane_";
+    if (elHeaderIcon) elHeaderIcon.textContent = "movie_filter";
+    fetchDownloadsList();
+  }
+}
+
+desktopNavBtns.forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+mobileNavBtns.forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+const elBtnDmMobile = document.getElementById("btn-download-manager-mobile");
+if (elBtnDmMobile) {
+  elBtnDmMobile.addEventListener("click", (e) => {
+    e.stopPropagation();
+    elDownloadManagerPanel.classList.toggle("hidden");
+  });
+}
 
 // Close Series Modal
 elBtnCloseModal.addEventListener("click", () => {
@@ -241,14 +294,23 @@ function renderFilmGrid(films) {
   elFilmGrid.innerHTML = films
     .map(
       (f) => `
-    <div class="film-card" data-url="${f.url}" data-title="${f.title}">
-      <img src="${f.poster || ""}" alt="${f.title}" onerror="this.src='https://via.placeholder.com/160x240/111/555?text=?'">
-      <div class="film-card-overlay"><span>${SVG_DOWNLOAD_ICON} ${activeSearchType === "series" ? "bölümler." : "indir."}</span></div>
-      <div class="film-card-body">
-        <div class="film-card-title">${f.title}</div>
-        <div class="film-card-meta">
-          ${f.year ? `<span>${f.year}</span>` : ""}
-          ${f.rating ? `<span class="film-card-rating">★ ${f.rating}</span>` : ""}
+    <div class="film-card group flex flex-col gap-3 cursor-pointer" data-url="${f.url}" data-title="${f.title}">
+      <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container border border-outline/50 group-hover:border-primary-container/50 transition-colors">
+        <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="${f.poster || ""}" alt="${f.title}" onerror="this.src='https://via.placeholder.com/160x240/111/555?text=?'">
+        <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+        <div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
+          <span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">download_done</span>
+        </div>
+      </div>
+      <div class="flex flex-col px-1">
+        <h3 class="font-bold text-sm text-on-surface truncate group-hover:text-primary-container transition-colors">${f.title}</h3>
+        <div class="flex justify-between items-center mt-1">
+          <span class="font-mono text-xs text-on-surface-variant/70">${f.year || ""}</span>
+          ${f.rating ? `
+          <div class="flex items-center gap-1 text-primary-container text-xs">
+            <span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+            <span class="font-mono text-xs">${f.rating}</span>
+          </div>` : ""}
         </div>
       </div>
     </div>
@@ -256,7 +318,7 @@ function renderFilmGrid(films) {
     )
     .join("");
 
-  document.querySelectorAll(".film-card").forEach((card) => {
+  elFilmGrid.querySelectorAll(".film-card").forEach((card) => {
     card.addEventListener("click", () => {
       if (activeSearchType === "series") {
         showSeriesDetails(card.dataset.url, card.dataset.title);
@@ -417,11 +479,16 @@ async function autoDownloadFilm(
       episodeUrl,
       status: "preparing",
       progress: 0,
+      filmTitle,
+      filmUrl
     };
     downloadTasksByUrl.set(filmUrl, task);
     if (episodeUrl) {
       episodeDownloadTasksByEpisodeUrl.set(episodeUrl, filmUrl);
     }
+    
+    // Refresh library grid to show new downloading task immediately
+    renderLibraryGrid(libraryFiles);
 
     const badge = root.querySelector('[data-role="status-badge"]');
     const cancelBtn = root.querySelector('[data-role="cancel-btn"]');
@@ -607,6 +674,9 @@ async function autoDownloadFilm(
           task.progress = pct;
           task.status = data.status;
           updateEpisodeDownloadState(task, pct);
+          
+          // Dynamically refresh library view with download progress
+          renderLibraryGrid(libraryFiles);
 
           if (data.status === "running") {
             badge.textContent = "indiriliyor.";
@@ -630,6 +700,7 @@ async function autoDownloadFilm(
             const parent = downloadBtn.parentNode;
             parent.querySelectorAll(".sub-dl-btn").forEach(el => el.remove());
             parent.querySelectorAll(".task-play-btn").forEach(el => el.remove());
+            parent.querySelectorAll(".task-export-btn").forEach(el => el.remove());
 
             // Oynat butonu ekle
             const playBtn = document.createElement("button");
@@ -643,11 +714,20 @@ async function autoDownloadFilm(
             });
             parent.appendChild(playBtn);
 
+            // Dışa aktar (export) butonu ekle
+            const exportBtn = document.createElement("button");
+            exportBtn.className = "btn btn-success task-export-btn";
+            exportBtn.style.marginLeft = "8px";
+            exportBtn.style.fontSize = "10px";
+            exportBtn.style.padding = "2px 6px";
+            exportBtn.innerHTML = `<i class="fa-solid fa-file-arrow-down"></i> export.`;
+            exportBtn.addEventListener("click", () => {
+              exportVideoFile(data.outputName);
+            });
+            parent.appendChild(exportBtn);
+
             // İndirilenler listesini güncelle
             fetchDownloadsList();
-
-            // Otomatik indirmeyi tetikle
-            downloadBtn.click();
 
             // Eğer altyazılar varsa onları da otomatik indir ve karta buton ekle
             if (data.subtitles && Array.isArray(data.subtitles)) {
@@ -1926,62 +2006,178 @@ const elVideoTimelineBg = document.getElementById("video-timeline-bg");
 const elVideoTimelineFill = document.getElementById("video-timeline-fill");
 const elVideoTimelineHandle = document.getElementById("video-timeline-handle");
 
-// Downloads Panel DOM Element
-const elDownloadsList = document.getElementById("downloads-list");
+// Downloads/Library DOM Elements
+const elLibraryGrid = document.getElementById("library-grid");
+const elLibrarySearchInput = document.getElementById("library-search-input");
+const elLibraryTotalCount = document.getElementById("library-total-count");
+
+// Global cache for downloaded files
+let libraryFiles = [];
 
 // Fetch and Render Downloaded Videos
 async function fetchDownloadsList() {
-  if (!elDownloadsList) return;
   try {
     const res = await fetch("/api/downloads-list");
     const data = await res.json();
     if (data.success) {
-      renderDownloadsList(data.files);
+      libraryFiles = data.files || [];
+      renderLibraryGrid(libraryFiles);
     }
   } catch (err) {
     console.error("İndirilenler listesi yüklenemedi:", err);
   }
 }
 
-function renderDownloadsList(files) {
-  if (!elDownloadsList) return;
-  if (!files || files.length === 0) {
-    elDownloadsList.innerHTML = `
-      <div class="downloads-empty">
-        <i class="fa-solid fa-folder-minus" style="font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.3;"></i>
-        indirilen video bulunamadı.
+// Client-side live search inside library
+if (elLibrarySearchInput) {
+  elLibrarySearchInput.addEventListener("input", () => {
+    const q = elLibrarySearchInput.value.trim().toLowerCase();
+    if (!q) {
+      renderLibraryGrid(libraryFiles);
+      return;
+    }
+    const filtered = libraryFiles.filter(f => f.name.toLowerCase().includes(q));
+    renderLibraryGrid(filtered);
+  });
+}
+
+function renderLibraryGrid(files) {
+  if (!elLibraryGrid) return;
+  
+  if (elLibraryTotalCount) {
+    elLibraryTotalCount.textContent = files.length;
+  }
+
+  // Get active tasks (excluding cancelled/error/completed)
+  const activeTasks = Array.from(downloadTasksByUrl.values()).filter(t => t.status === "running" || t.status === "waiting" || t.status === "preparing");
+
+  if (files.length === 0 && activeTasks.length === 0) {
+    elLibraryGrid.innerHTML = `
+      <div class="library-empty col-span-full text-center py-16 border border-dashed border-outline rounded-xl flex flex-col items-center justify-center gap-3">
+        <span class="material-symbols-outlined text-4xl text-on-surface-variant/20">folder_open</span>
+        <span class="font-mono text-xs text-on-surface-variant/50">indirilen film bulunamadı.</span>
       </div>
     `;
     return;
   }
 
-  elDownloadsList.innerHTML = files.map(file => {
-    const displaySize = formatBytes(file.size);
-    const dateStr = new Date(file.createdAt).toLocaleDateString("tr-TR");
-    return `
-      <div class="download-item">
-        <div class="download-item-info">
-          <span class="download-item-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
-          <div class="download-item-meta">
-            <span>boyut: ${displaySize}</span>
-            <span>tarih: ${dateStr}</span>
+  let htmlContent = "";
+
+  // 1) Render Active Tasks first
+  activeTasks.forEach(task => {
+    const pct = task.progress || 0;
+    const cleanName = task.filmTitle || "İndiriliyor...";
+    htmlContent += `
+      <div class="group flex flex-col gap-3 relative" data-task-id="${task.procId}">
+        <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container border border-outline/50 transition-colors">
+          <div class="w-full h-full flex flex-col items-center justify-center bg-surface-container-high/80 text-on-surface-variant gap-2 p-4 text-center">
+            <span class="material-symbols-outlined text-3xl animate-bounce text-primary-container">downloading</span>
+            <span class="font-mono text-[10px] text-primary-container tracking-wider uppercase">DOWNLOADING...</span>
+          </div>
+          <!-- Progress Bar Overlay -->
+          <div class="absolute bottom-0 left-0 w-full h-1 bg-surface-variant z-10">
+            <div class="h-full bg-primary-container transition-all" style="width: ${pct}%"></div>
           </div>
         </div>
-        <div class="download-item-actions">
-          <button class="btn btn-primary btn-small play-video-btn" data-file="${escapeHtml(file.name)}">
-            <i class="fa-solid fa-play"></i> oynat.
-          </button>
+        <div class="flex flex-col px-1">
+          <h3 class="font-bold text-sm text-on-surface truncate">${cleanName}</h3>
+          <div class="flex justify-between items-center mt-1">
+            <span class="font-mono text-xs text-primary-container/80 animate-pulse">${pct}% • ${task.status === "waiting" ? "bekliyor." : "indiriliyor."}</span>
+            <button class="text-red-400 hover:text-red-300 font-mono text-[10px] dm-task-cancel-btn-lib" data-url="${task.filmUrl || ""}">
+              iptal.
+            </button>
+          </div>
         </div>
       </div>
     `;
-  }).join("");
+  });
 
-  elDownloadsList.querySelectorAll(".play-video-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const fileName = btn.dataset.file;
+  // 2) Render Completed Video Files
+  files.forEach(file => {
+    const isTs = file.name.toLowerCase().endsWith(".ts");
+    const displaySize = formatBytes(file.size);
+    const dateStr = new Date(file.createdAt).toLocaleDateString("tr-TR");
+    
+    let displayName = file.name.replace(/\.[^/.]+$/, ""); // strip extension
+    displayName = displayName.replace(/_/g, " ").replace(/_+/g, " ");
+
+    htmlContent += `
+      <div class="group flex flex-col gap-3 cursor-pointer play-library-btn" data-file="${escapeHtml(file.name)}">
+        <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container border border-outline/50 group-hover:border-primary-container/50 transition-colors">
+          <div class="w-full h-full flex flex-col items-center justify-center bg-surface-container-high text-on-surface-variant/40 hover:text-on-surface-variant transition-colors p-4 text-center">
+            <span class="material-symbols-outlined text-4xl">movie</span>
+            <span class="font-mono text-[9px] text-on-surface-variant/30 mt-2">${isTs ? "TS CONTAINER" : "MP4 CONTAINER"}</span>
+          </div>
+          <!-- Status Badge -->
+          <div class="absolute top-3 right-3 bg-surface-container/90 backdrop-blur-sm border border-outline/50 px-2 py-1 rounded font-mono text-[9px] text-primary-container">${isTs ? "TS" : "MP4"}</div>
+          <!-- Gradient Overlay -->
+          <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/60 to-transparent"></div>
+          <!-- Play Hover Overlay -->
+          <div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm z-10">
+            <span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+          </div>
+        </div>
+        <div class="flex flex-col px-1" onclick="event.stopPropagation();">
+          <h3 class="font-bold text-sm text-on-surface truncate group-hover:text-primary-container transition-colors play-title-click" data-file="${escapeHtml(file.name)}" style="cursor: pointer;">${displayName}</h3>
+          <div class="flex justify-between items-center mt-1">
+            <span class="font-mono text-[10px] text-on-surface-variant/70">${displaySize} • ${dateStr}</span>
+            <button class="px-3 py-1 bg-surface-container-highest border border-outline rounded-full font-mono text-[9px] text-primary-container hover:bg-primary-container hover:text-black transition-all export-video-btn" data-file="${escapeHtml(file.name)}">
+              export.
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  elLibraryGrid.innerHTML = htmlContent;
+
+  // Bind events
+  elLibraryGrid.querySelectorAll(".play-library-btn").forEach(card => {
+    card.addEventListener("click", () => {
+      const fileName = card.dataset.file;
       openVideoPlayer(fileName);
     });
   });
+
+  elLibraryGrid.querySelectorAll(".play-title-click").forEach(title => {
+    title.addEventListener("click", () => {
+      const fileName = title.dataset.file;
+      openVideoPlayer(fileName);
+    });
+  });
+
+  elLibraryGrid.querySelectorAll(".export-video-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const fileName = btn.dataset.file;
+      exportVideoFile(fileName);
+    });
+  });
+
+  elLibraryGrid.querySelectorAll(".dm-task-cancel-btn-lib").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const filmUrl = btn.dataset.url;
+      const activeTask = downloadTasksByUrl.get(filmUrl);
+      if (activeTask && activeTask.taskId) {
+        await fetch(`/api/task-cancel/${activeTask.taskId}`, { method: "POST" });
+        activeTask.status = "cancelled";
+        renderLibraryGrid(libraryFiles);
+      }
+    });
+  });
+}
+
+// Function to trigger manual export download
+function exportVideoFile(fileName) {
+  const a = document.createElement("a");
+  a.href = `/downloads/${encodeURIComponent(fileName)}`;
+  a.setAttribute("download", fileName);
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // Open Video Player Modal
@@ -1990,33 +2186,32 @@ function openVideoPlayer(fileName) {
   let videoSrc = "";
 
   if (isTs) {
-    // TS files: use stream API on server
     videoSrc = `/api/stream-ts?file=${encodeURIComponent(fileName)}`;
   } else {
-    // MP4 files: static serve
     videoSrc = `/downloads/${encodeURIComponent(fileName)}`;
   }
 
-  elVideoPlayerTitle.textContent = fileName;
-  elMainVideo.src = videoSrc;
-  elVideoPlayerModal.classList.remove("hidden");
+  if (elVideoPlayerTitle) elVideoPlayerTitle.textContent = fileName;
+  if (elMainVideo) elMainVideo.src = videoSrc;
+  if (elVideoPlayerModal) elVideoPlayerModal.classList.remove("hidden");
   
-  // Auto play
-  elMainVideo.play().catch(err => {
-    console.log("Otomatik oynatma engellendi:", err);
-  });
+  if (elMainVideo) {
+    elMainVideo.play().catch(err => {
+      console.log("Otomatik oynatma engellendi:", err);
+    });
+  }
 
   updatePlayPauseIcon();
-  
-  // Listen keyboard shortcuts globally when player is open
   document.addEventListener("keydown", handleVideoKeydown);
 }
 
 // Close Video Player Modal
 function closeVideoPlayer() {
-  elMainVideo.pause();
-  elMainVideo.src = "";
-  elVideoPlayerModal.classList.add("hidden");
+  if (elMainVideo) {
+    elMainVideo.pause();
+    elMainVideo.src = "";
+  }
+  if (elVideoPlayerModal) elVideoPlayerModal.classList.add("hidden");
   document.removeEventListener("keydown", handleVideoKeydown);
 }
 
@@ -2026,6 +2221,7 @@ if (elBtnCloseVideo) {
 
 // Play & Pause Controls
 function togglePlay() {
+  if (!elMainVideo) return;
   if (elMainVideo.paused) {
     elMainVideo.play();
   } else {
@@ -2035,12 +2231,12 @@ function togglePlay() {
 }
 
 function updatePlayPauseIcon() {
-  if (!elBtnVideoPlay) return;
-  const icon = elBtnVideoPlay.querySelector("i");
+  if (!elBtnVideoPlay || !elMainVideo) return;
+  const icon = elBtnVideoPlay.querySelector("span");
   if (elMainVideo.paused) {
-    icon.className = "fa-solid fa-play";
+    icon.textContent = "play_arrow";
   } else {
-    icon.className = "fa-solid fa-pause";
+    icon.textContent = "pause";
   }
 }
 
@@ -2052,13 +2248,13 @@ if (elMainVideo) {
 }
 
 // Rewind & Forward
-if (elBtnVideoRewind) {
+if (elBtnVideoRewind && elMainVideo) {
   elBtnVideoRewind.addEventListener("click", () => {
     elMainVideo.currentTime = Math.max(0, elMainVideo.currentTime - 10);
   });
 }
 
-if (elBtnVideoForward) {
+if (elBtnVideoForward && elMainVideo) {
   elBtnVideoForward.addEventListener("click", () => {
     elMainVideo.currentTime = Math.min(elMainVideo.duration, elMainVideo.currentTime + 10);
   });
@@ -2066,28 +2262,28 @@ if (elBtnVideoForward) {
 
 // Volume & Mute Controls
 function updateVolumeIcon() {
-  if (!elBtnVideoMute) return;
-  const icon = elBtnVideoMute.querySelector("i");
+  if (!elBtnVideoMute || !elMainVideo) return;
+  const icon = elBtnVideoMute.querySelector("span");
   if (elMainVideo.muted || elMainVideo.volume === 0) {
-    icon.className = "fa-solid fa-volume-xmark";
-    elVideoVolumeSlider.value = 0;
+    icon.textContent = "volume_off";
+    if (elVideoVolumeSlider) elVideoVolumeSlider.value = 0;
   } else if (elMainVideo.volume < 0.5) {
-    icon.className = "fa-solid fa-volume-low";
-    elVideoVolumeSlider.value = elMainVideo.volume;
+    icon.textContent = "volume_down";
+    if (elVideoVolumeSlider) elVideoVolumeSlider.value = elMainVideo.volume;
   } else {
-    icon.className = "fa-solid fa-volume-high";
-    elVideoVolumeSlider.value = elMainVideo.volume;
+    icon.textContent = "volume_up";
+    if (elVideoVolumeSlider) elVideoVolumeSlider.value = elMainVideo.volume;
   }
 }
 
-if (elBtnVideoMute) {
+if (elBtnVideoMute && elMainVideo) {
   elBtnVideoMute.addEventListener("click", () => {
     elMainVideo.muted = !elMainVideo.muted;
     updateVolumeIcon();
   });
 }
 
-if (elVideoVolumeSlider) {
+if (elVideoVolumeSlider && elMainVideo) {
   elVideoVolumeSlider.addEventListener("input", (e) => {
     elMainVideo.volume = e.target.value;
     elMainVideo.muted = e.target.value == 0;
@@ -2106,11 +2302,11 @@ function formatTime(seconds) {
 
 if (elMainVideo) {
   elMainVideo.addEventListener("loadedmetadata", () => {
-    elVideoDuration.textContent = formatTime(elMainVideo.duration);
+    if (elVideoDuration) elVideoDuration.textContent = formatTime(elMainVideo.duration);
   });
 
   elMainVideo.addEventListener("timeupdate", () => {
-    elVideoCurrentTime.textContent = formatTime(elMainVideo.currentTime);
+    if (elVideoCurrentTime) elVideoCurrentTime.textContent = formatTime(elMainVideo.currentTime);
     if (elMainVideo.duration) {
       const pct = (elMainVideo.currentTime / elMainVideo.duration) * 100;
       if (elVideoTimelineFill) elVideoTimelineFill.style.width = `${pct}%`;
@@ -2120,7 +2316,7 @@ if (elMainVideo) {
 }
 
 // Seek Timeline
-if (elVideoTimelineWrapper) {
+if (elVideoTimelineWrapper && elMainVideo) {
   elVideoTimelineWrapper.addEventListener("click", (e) => {
     const rect = elVideoTimelineBg.getBoundingClientRect();
     const pos = (e.clientX - rect.left) / rect.width;
@@ -2129,7 +2325,7 @@ if (elVideoTimelineWrapper) {
 }
 
 // Picture-in-Picture
-if (elBtnVideoPip) {
+if (elBtnVideoPip && elMainVideo) {
   elBtnVideoPip.addEventListener("click", async () => {
     try {
       if (document.pictureInPictureElement) {
@@ -2145,6 +2341,7 @@ if (elBtnVideoPip) {
 
 // Fullscreen Controls
 function toggleFullscreen() {
+  if (!elMainVideo) return;
   const container = elMainVideo.parentElement;
   if (!document.fullscreenElement) {
     container.requestFullscreen().catch(err => {
@@ -2164,7 +2361,7 @@ function showControls() {
   if (!elVideoControlsOverlay) return;
   elVideoControlsOverlay.classList.add("visible");
   clearTimeout(controlsTimeout);
-  if (!elMainVideo.paused) {
+  if (elMainVideo && !elMainVideo.paused) {
     controlsTimeout = setTimeout(() => {
       elVideoControlsOverlay.classList.remove("visible");
     }, 3000);
@@ -2181,7 +2378,7 @@ if (elMainVideo) {
 
 // Keyboard Listeners
 function handleVideoKeydown(e) {
-  if (elVideoPlayerModal.classList.contains("hidden")) return;
+  if (!elMainVideo || elVideoPlayerModal.classList.contains("hidden")) return;
   
   const key = e.key.toLowerCase();
   if (key === " ") {
