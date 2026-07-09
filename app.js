@@ -1350,6 +1350,7 @@ function populateBulkPanelOptions(streams) {
       elBulkQuality.value = savedQuality;
     }
 
+    elBulkQuality.dispatchEvent(new Event("change"));
     syncOpenEpisodeDropdowns();
   };
 
@@ -1494,6 +1495,7 @@ function renderEpisodes(episodes, seriesTitle, streams) {
       ) {
         qualitySelect.value = elBulkQuality.value;
       }
+      qualitySelect.dispatchEvent(new Event("change"));
       bindActiveTaskForCurrentSelection();
     });
 
@@ -1914,6 +1916,7 @@ function renderFilmSources(filmUrl, filmTitle, playerData) {
       opt.textContent = p;
       sourceSelect.appendChild(opt);
     });
+    sourceSelect.dispatchEvent(new Event("change"));
   };
 
   langSelect.addEventListener("change", updateSources);
@@ -3704,6 +3707,31 @@ function makeSelectCustom(selectElement, placeholderPrefix = "") {
   });
   
   updateDropdownItems();
+
+  // Intercept programmatic value and selectedIndex changes to sync custom UI
+  const valueDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+  Object.defineProperty(selectElement, "value", {
+    get() {
+      return valueDesc.get.call(this);
+    },
+    set(val) {
+      valueDesc.set.call(this, val);
+      updateDropdownItems();
+    },
+    configurable: true
+  });
+
+  const indexDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "selectedIndex");
+  Object.defineProperty(selectElement, "selectedIndex", {
+    get() {
+      return indexDesc.get.call(this);
+    },
+    set(val) {
+      indexDesc.set.call(this, val);
+      updateDropdownItems();
+    },
+    configurable: true
+  });
   
   const observer = new MutationObserver(() => {
     updateDropdownItems();
