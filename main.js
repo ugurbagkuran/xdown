@@ -2,7 +2,8 @@ import { app, BrowserWindow, Menu, dialog } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import { startServer } from "./server.js";
-import { autoUpdater } from "electron-updater";
+import pkg from "electron-updater";
+const { autoUpdater } = pkg;
 
 // Loglama ve güncelleme ayarları
 autoUpdater.autoDownload = true;
