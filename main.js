@@ -1,7 +1,12 @@
-import { app, BrowserWindow, Menu } from "electron";
+import { app, BrowserWindow, Menu, dialog } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import { startServer } from "./server.js";
+import { autoUpdater } from "electron-updater";
+
+// Loglama ve güncelleme ayarları
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +14,30 @@ const __dirname = path.dirname(__filename);
 let mainWindow = null;
 let serverInstance = null;
 let serverPort = 3000;
+
+// Güncelleme Event Dinleyicileri
+autoUpdater.on("update-available", (info) => {
+  console.log(`Yeni güncelleme bulundu: ${info.version}. İndiriliyor...`);
+});
+
+autoUpdater.on("update-downloaded", (info) => {
+  dialog.showMessageBox({
+    type: "info",
+    title: "Güncelleme Hazır",
+    message: `Yeni sürüm (${info.version}) başarıyla indirildi. Güncellemeyi uygulamak için uygulamayı yeniden başlatmak istiyor musunuz?`,
+    buttons: ["Yeniden Başlat ve Güncelle", "Daha Sonra"],
+    defaultId: 0,
+    cancelId: 1
+  }).then((result) => {
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+});
+
+autoUpdater.on("error", (err) => {
+  console.error("Güncelleme hatası:", err);
+});
 
 async function bootExpressServer() {
   // Port çakışmalarını önlemek için 3000'den başlayıp boş port arıyoruz
@@ -47,6 +76,11 @@ async function createWindow() {
 
   // Yerel sunucuyu yükle
   mainWindow.loadURL(`http://localhost:${serverPort}`);
+
+  // Pencere gösterilmeye hazır olduğunda güncellemeleri kontrol et
+  mainWindow.once("ready-to-show", () => {
+    autoUpdater.checkForUpdatesAndNotify();
+  });
 
   mainWindow.on("closed", () => {
     mainWindow = null;

@@ -1,6 +1,6 @@
 {
   "name": "filmdownloader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Şifreli PNG Video Parçalarını Yakalama ve Çözme Yazılımı",
   "type": "module",
   "main": "main.js",
@@ -12,6 +12,7 @@
     "dist": "electron-builder --win"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "express": "^4.19.2"
   },
   "devDependencies": {
@@ -21,6 +22,13 @@
   "build": {
     "appId": "com.antigravity.filmdownloader",
     "productName": "filmdownloader",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ugurbagkuran",
+        "repo": "xdown"
+      }
+    ],
     "win": {
       "target": "portable"
     },
