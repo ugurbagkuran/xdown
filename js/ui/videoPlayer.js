@@ -1,4 +1,4 @@
-import { apiGetVideoSubtitles, apiPrepareVideo, apiLogToServer } from "../services/api.js";
+import { apiGetVideoSubtitles, apiPrepareVideo, apiLogToServer, apiGetSettings } from "../services/api.js";
 
 // DOM Elements inside module (fetched lazily)
 let elMainVideo, elVideoPlayerModal, elVideoPlayerTitle, elVideoControlsOverlay,
@@ -271,8 +271,21 @@ export async function openVideoPlayer(fileName, options = {}) {
 
   applySavedSubtitleSettings();
 
-  if (elVideoSpeedSelect) elVideoSpeedSelect.value = "1";
-  if (elMainVideo) elMainVideo.playbackRate = 1;
+  let defaultSpeed = 1;
+  try {
+    const settingsData = await apiGetSettings();
+    if (settingsData.success && settingsData.settings) {
+      defaultSpeed = parseFloat(settingsData.settings.defaultPlaybackSpeed) || 1;
+    }
+  } catch (_) {}
+
+  if (elVideoSpeedSelect) elVideoSpeedSelect.value = String(defaultSpeed);
+  if (elMainVideo) elMainVideo.playbackRate = defaultSpeed;
+
+  const elMenuSpeedVal = document.getElementById("menu-speed-val");
+  if (elMenuSpeedVal) {
+    elMenuSpeedVal.textContent = defaultSpeed === 1 ? "1x" : `${defaultSpeed}x`;
+  }
 
   closeEpisodesPanel();
   hideNextEpisodeCountdown();

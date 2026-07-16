@@ -77,3 +77,22 @@ export async function apiLogToServer(type, message) {
     });
   } catch (_) {}
 }
+
+export async function apiGetSettings() {
+  const res = await fetch("/api/settings");
+  return await res.json();
+}
+
+export async function apiSaveSettings(settings) {
+  const res = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings)
+  });
+  return await res.json();
+}
+
+export async function apiSelectFolder() {
+  const res = await fetch("/api/select-folder");
+  return await res.json();
+}

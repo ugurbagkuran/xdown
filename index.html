@@ -105,6 +105,7 @@
         <div class="flex px-margin-mobile gap-6 overflow-x-auto border-b border-outline-variant pt-2">
             <button id="nav-library-mobile" class="nav-tab-btn text-primary-container font-bold border-b-2 border-primary-container pb-2 text-sm whitespace-nowrap" data-tab="tab-library">kutuphane.</button>
             <button id="nav-search-mobile" class="nav-tab-btn text-on-surface-variant font-medium pb-2 text-sm whitespace-nowrap" data-tab="tab-search">film_ara.</button>
+            <button id="nav-settings-mobile" class="nav-tab-btn text-on-surface-variant font-medium pb-2 text-sm whitespace-nowrap" data-tab="tab-settings">ayarlar.</button>
         </div>
     </nav>
 
@@ -122,6 +123,10 @@
             <button id="nav-search" class="nav-tab-btn flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all text-sm text-left w-full" data-tab="tab-search">
                 <span class="material-symbols-outlined">download</span>
                 film_indirme.
+            </button>
+            <button id="nav-settings" class="nav-tab-btn flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-variant rounded-xl transition-all text-sm text-left w-full" data-tab="tab-settings">
+                <span class="material-symbols-outlined">settings</span>
+                ayarlar.
             </button>
         </nav>
         
@@ -218,6 +223,71 @@
                         <span class="material-symbols-outlined text-4xl text-on-surface-variant/20">folder_open</span>
                         <span class="font-mono text-xs text-on-surface-variant/50">indirilen film bulunamadı.</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- ══════════ SEKMELİ 3: AYARLAR ══════════ -->
+            <div id="tab-settings" class="tab-panel hidden flex flex-col gap-6">
+                <div class="bg-surface-container border border-outline rounded-xl p-6 flex flex-col gap-6 max-w-2xl">
+                    <div class="flex items-center gap-2 border-b border-outline/30 pb-3">
+                        <span class="material-symbols-outlined text-primary-container">settings</span>
+                        <h3 class="font-mono text-sm text-on-surface">uygulama_ayarları.</h3>
+                    </div>
+
+                    <!-- 1. Kütüphane Konumu Ayarı -->
+                    <div class="flex flex-col gap-2">
+                        <label class="font-mono text-xs text-on-surface-variant">kütüphane_konumu (indirilenler klasörü):</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="settings-downloads-dir" readonly class="flex-grow h-11 bg-surface-container-low border border-outline rounded-xl px-4 text-xs font-mono text-on-surface outline-none cursor-default" placeholder="Klasör seçilmedi..."/>
+                            <button id="btn-settings-select-dir" class="h-11 px-5 bg-primary-container text-black font-bold rounded-xl text-xs hover:bg-primary-fixed transition-colors flex items-center gap-1.5 shrink-0">
+                                <span class="material-symbols-outlined text-[18px]">folder_open</span> seç.
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-on-surface-variant/60 font-mono">İndirilen videolar ve dizi bölümleri bu klasörden okunacaktır.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-outline/20 pt-6">
+                        <!-- 2. Eşzamanlı İndirme Sayısı -->
+                        <div class="flex flex-col gap-2">
+                            <label for="settings-concurrency" class="font-mono text-xs text-on-surface-variant">maks_eşzamanlı_indirme:</label>
+                            <select id="settings-concurrency" class="h-11 bg-surface-container-low border border-outline rounded-xl px-4 text-xs text-on-surface outline-none">
+                                <option value="2">2 segment (Yavaş bağlantılar)</option>
+                                <option value="5" selected>5 segment (Normal - Önerilen)</option>
+                                <option value="10">10 segment (Hızlı bağlantılar)</option>
+                                <option value="15">15 segment (Çok hızlı bağlantılar)</option>
+                            </select>
+                        </div>
+
+                        <!-- 3. Varsayılan Oynatma Hızı -->
+                        <div class="flex flex-col gap-2">
+                            <label for="settings-playback-speed" class="font-mono text-xs text-on-surface-variant">varsayılan_oynatma_hızı:</label>
+                            <select id="settings-playback-speed" class="h-11 bg-surface-container-low border border-outline rounded-xl px-4 text-xs text-on-surface outline-none">
+                                <option value="0.5">0.5x</option>
+                                <option value="0.75">0.75x</option>
+                                <option value="1" selected>1x (Normal)</option>
+                                <option value="1.25">1.25x</option>
+                                <option value="1.5">1.5x</option>
+                                <option value="2">2x</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 4. Bildirim Tercihi -->
+                    <div class="flex items-center gap-3 border-t border-outline/20 pt-6">
+                        <input type="checkbox" id="settings-notifications" class="w-4 h-4 bg-surface-container-low border border-outline rounded text-primary-container focus:ring-primary-container cursor-pointer"/>
+                        <div class="flex flex-col">
+                            <label for="settings-notifications" class="font-mono text-xs text-on-surface-variant cursor-pointer">indirme_tamamlandığında_bildir.</label>
+                            <span class="text-[9px] text-on-surface-variant/50">İndirmeler bittiğinde sistem bildirimi gösterilir.</span>
+                        </div>
+                    </div>
+
+                    <!-- Kaydet Butonu -->
+                    <div class="flex justify-end border-t border-outline/20 pt-6">
+                        <button id="btn-settings-save" class="h-11 px-8 bg-primary-container text-black font-bold rounded-xl text-xs hover:bg-primary-fixed transition-colors flex items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-[18px]">save</span> ayarları_kaydet.
+                        </button>
+                    </div>
+
                 </div>
             </div>
 

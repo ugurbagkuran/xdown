@@ -8,11 +8,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Import custom modules
+import { appSettings, saveSettings } from "./server/utils/settings.js";
 import { 
   fetchBuffer, 
   checkUrlReachable, 
   estimateSegmentsSize 
 } from "./server/utils/fetcher.js";
+
+let dialog = null;
+if (process.versions.electron) {
+  import("electron").then((m) => {
+    dialog = m.dialog;
+  }).catch((err) => {
+    console.error("Electron import hatasi:", err);
+  });
+}
 
 import { 
   detectTsOffset, 
@@ -68,6 +78,61 @@ app.post("/api/log", (req, res) => {
   const { type, message } = req.body;
   console.log(`[CLIENT ${type || 'ERROR'}]`, message);
   res.sendStatus(200);
+});
+
+// Electron Klasör Seçme Endpoint'i
+app.get("/api/select-folder", async (req, res) => {
+  if (!dialog) {
+    return res.status(400).json({ success: false, error: "Electron ortamı tespit edilemedi veya dialog API yüklenemedi." });
+  }
+  
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory"]
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return res.json({ success: false, canceled: true });
+    }
+    res.json({ success: true, path: result.filePaths[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Ayarları Getir
+app.get("/api/settings", (req, res) => {
+  res.json({ success: true, settings: appSettings });
+});
+
+// Ayarları Kaydet
+app.post("/api/settings", (req, res) => {
+  const { downloadsDir, maxConcurrency, showNotifications, defaultPlaybackSpeed } = req.body;
+  
+  if (downloadsDir) {
+    try {
+      if (!fs.existsSync(downloadsDir)) {
+        fs.mkdirSync(downloadsDir, { recursive: true });
+      }
+      appSettings.downloadsDir = downloadsDir;
+    } catch (err) {
+      return res.status(400).json({ success: false, error: "Klasör yolu geçersiz veya erişim yetkisi yok." });
+    }
+  }
+  
+  if (maxConcurrency !== undefined) {
+    appSettings.maxConcurrency = parseInt(maxConcurrency, 10) || 5;
+  }
+  
+  if (showNotifications !== undefined) {
+    appSettings.showNotifications = !!showNotifications;
+  }
+  
+  if (defaultPlaybackSpeed !== undefined) {
+    appSettings.defaultPlaybackSpeed = parseFloat(defaultPlaybackSpeed) || 1;
+  }
+  
+  saveSettings();
+  res.json({ success: true, settings: appSettings });
 });
 
 // ─── SEARCH & AUTO-EXTRACT ENDPOINTS ─────────────────────────────────────────
@@ -487,7 +552,7 @@ app.post("/api/download", (req, res) => {
   const taskId = crypto.randomUUID();
   const taskOutputName = outputName || `video_${Date.now()}.ts`;
 
-  const downloadsDir = path.join(process.cwd(), "downloads");
+  const downloadsDir = appSettings.downloadsDir;
   if (!fs.existsSync(downloadsDir)) {
     fs.mkdirSync(downloadsDir, { recursive: true });
   }
@@ -519,7 +584,7 @@ app.post("/api/download", (req, res) => {
       key,
       iv,
       stripBytes,
-      concurrency,
+      concurrency: concurrency || appSettings.maxConcurrency || 5,
       referer,
       candidateHosts,
       subtitles,
@@ -577,7 +642,7 @@ app.post("/api/task-cancel/:taskId", (req, res) => {
 });
 
 function resolveDownloadFilePath(fileParam) {
-  const downloadsDir = path.join(process.cwd(), "downloads");
+  const downloadsDir = appSettings.downloadsDir;
   const decoded = decodeURIComponent(String(fileParam || ""));
   const fileName = path.basename(decoded);
   const filePath = path.join(downloadsDir, fileName);
@@ -763,9 +828,9 @@ app.get("/api/prepare-video", async (req, res) => {
 });
 
 // List downloaded files (.mp4 and .ts)
-app.get("/api/downloads-list", (req, res) => {
-  const downloadsDir = path.join(process.cwd(), "downloads");
-  if (!fs.existsSync(downloadsDir)) {
+  app.get("/api/downloads-list", (req, res) => {
+    const downloadsDir = appSettings.downloadsDir;
+    if (!fs.existsSync(downloadsDir)) {
     return res.json({ success: true, files: [] });
   }
 
@@ -803,7 +868,7 @@ app.get("/api/stream-ts", async (req, res) => {
     return res.status(400).send("Dosya belirtilmedi.");
   }
 
-  const downloadsDir = path.join(process.cwd(), "downloads");
+  const downloadsDir = appSettings.downloadsDir;
   const filePath = path.join(downloadsDir, file);
 
   const relative = path.relative(downloadsDir, filePath);
@@ -855,8 +920,12 @@ app.get("/api/stream-ts", async (req, res) => {
   });
 });
 
-app.use("/downloads", express.static(path.join(process.cwd(), "downloads")));
-app.use("/playable-cache", express.static(path.join(process.cwd(), "downloads", ".playable-cache")));
+app.use("/downloads", (req, res, next) => {
+  express.static(appSettings.downloadsDir)(req, res, next);
+});
+app.use("/playable-cache", (req, res, next) => {
+  express.static(path.join(appSettings.downloadsDir, ".playable-cache"))(req, res, next);
+});
 
 export { app };
 export function startServer(port = 3000) {

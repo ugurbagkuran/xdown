@@ -4,7 +4,8 @@ import {
   apiAnalyze, 
   apiDownload, 
   apiGetTaskStatus, 
-  apiCancelTask 
+  apiCancelTask,
+  apiGetSettings 
 } from "../services/api.js";
 import { openVideoPlayer } from "./videoPlayer.js";
 
@@ -379,6 +380,31 @@ export async function autoDownloadFilm(
             progressBarFill.style.width = "100%";
             progressPercent.textContent = "100%";
             downloadLink.classList.remove("hidden");
+            
+            // Sistem bildirimi gönder
+            try {
+              apiGetSettings().then(settingsData => {
+                if (settingsData.success && settingsData.settings && settingsData.settings.showNotifications) {
+                  if (Notification.permission === "granted") {
+                    new Notification("İndirme Tamamlandı", {
+                      body: `${task.fileName || 'Video'} başarıyla indirildi.`,
+                      icon: "/download.svg"
+                    });
+                  } else if (Notification.permission !== "denied") {
+                    Notification.requestPermission().then(permission => {
+                      if (permission === "granted") {
+                        new Notification("İndirme Tamamlandı", {
+                          body: `${task.fileName || 'Video'} başarıyla indirildi.`,
+                          icon: "/download.svg"
+                        });
+                      }
+                    });
+                  }
+                }
+              });
+            } catch (err) {
+              console.error("Bildirim gönderilemedi:", err);
+            }
             downloadBtn.href = `/downloads/${data.outputName}`;
             downloadBtn.setAttribute("download", data.outputName);
             cancelBtn.remove();

@@ -1,5 +1,6 @@
 // Import modular components
 import { initTabs } from "./js/ui/tabs.js";
+import { initSettings } from "./js/ui/settings.js";
 import { 
   initDownloadManagerEvents, 
   autoDownloadFilm, 
@@ -369,11 +370,15 @@ function isEpisodeNearlyFinished(current, total) {
 
 // App Initialization triggers
 window.addEventListener("DOMContentLoaded", () => {
+  // Global reference for settings change
+  window.refreshLibraryList = fetchDownloadsList;
+
   // Initialize UI panels and controls
   initTabs(fetchDownloadsList);
   initDownloadManagerEvents();
   initSeriesModalEvents();
   setupVideoPlayerEvents();
+  initSettings();
 
   // Bind download callbacks
   registerDownloadsCallback(fetchDownloadsList);

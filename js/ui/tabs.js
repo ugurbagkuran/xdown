@@ -33,6 +33,9 @@ export function initTabs(onSwitchToLibrary) {
       if (elHeaderTitle) elHeaderTitle.textContent = "kütüphane_";
       if (elHeaderIcon) elHeaderIcon.textContent = "movie_filter";
       if (onSwitchToLibrary) onSwitchToLibrary();
+    } else if (tabId === "tab-settings") {
+      if (elHeaderTitle) elHeaderTitle.textContent = "ayarlar.";
+      if (elHeaderIcon) elHeaderIcon.textContent = "settings";
     }
   }
 

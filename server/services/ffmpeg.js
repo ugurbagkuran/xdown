@@ -1,9 +1,10 @@
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
+import { appSettings } from "../utils/settings.js";
 
 export function ensurePlayableCacheDir() {
-  const cacheDir = path.join(process.cwd(), "downloads", ".playable-cache");
+  const cacheDir = path.join(appSettings.downloadsDir, ".playable-cache");
   if (!fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir, { recursive: true });
   }
@@ -11,7 +12,7 @@ export function ensurePlayableCacheDir() {
 }
 
 export function ensureThumbnailCacheDir() {
-  const cacheDir = path.join(process.cwd(), "downloads", ".thumbnail-cache");
+  const cacheDir = path.join(appSettings.downloadsDir, ".thumbnail-cache");
   if (!fs.existsSync(cacheDir)) {
     fs.mkdirSync(cacheDir, { recursive: true });
   }
