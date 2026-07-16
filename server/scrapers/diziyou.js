@@ -103,6 +103,9 @@ export async function getSeriesDetail(url) {
     const episodeNum = parseInt(m[4], 10);
     const episodeName = m[7] ? m[7].trim() : "";
 
+    const hasParentheses = episodeName.startsWith("(") && episodeName.endsWith(")");
+    const displayTitle = episodeName ? (hasParentheses ? ` ${episodeName}` : ` (${episodeName})`) : "";
+
     if (!seasonsMap.has(seasonNum)) {
       seasonsMap.set(seasonNum, []);
     }
@@ -112,7 +115,7 @@ export async function getSeriesDetail(url) {
       season: seasonNum,
       episode: episodeNum,
       name: episodeName || `${episodeNum}. Bölüm`,
-      title: `${seasonNum}. Sezon ${episodeNum}. Bölüm ${episodeName ? `(${episodeName})` : ""}`,
+      title: `${seasonNum}. Sezon ${episodeNum}. Bölüm${displayTitle}`,
     });
   }
 

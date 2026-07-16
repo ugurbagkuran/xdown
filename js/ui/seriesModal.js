@@ -159,8 +159,19 @@ function renderEpisodes(episodes) {
           throw new Error("Yayın kaynağı bulunamadı.");
         }
 
-        const stream = details.streams[0]; // Türkçe Altyazılı veya ilk yayın
-        const quality = stream.qualities[0];
+        let stream = details.streams[0];
+        const bulkLang = document.getElementById("bulk-lang");
+        if (bulkLang && bulkLang.value) {
+          const matchedStream = details.streams.find(s => s.name === bulkLang.value);
+          if (matchedStream) stream = matchedStream;
+        }
+
+        let quality = stream.qualities[0];
+        const bulkQuality = document.getElementById("bulk-quality");
+        if (bulkQuality && bulkQuality.value) {
+          const matchedQuality = stream.qualities.find(q => q.resolution === bulkQuality.value);
+          if (matchedQuality) quality = matchedQuality;
+        }
         
         await autoDownloadFilm(
           quality.m3u8Url,
