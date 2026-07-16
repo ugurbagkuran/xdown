@@ -11,7 +11,9 @@ let elMainVideo, elVideoPlayerModal, elVideoPlayerTitle, elVideoControlsOverlay,
     elBtnVideoSeasonPicker, elVideoSeasonDisplayValue, elVideoSeasonDropdownList,
     elSpeedDisplayValue, elSpeedDropdownList, elBtnVideoSpeed, elVideoTimelineWrapper,
     elBtnVideoNextEpCountdownPlay, elNextEpisodeCountdown, elNextEpCountdownTitle,
-    elNextEpCountdownTime, elVideoSpeedSelect, elBtnVideoSubtitle;
+    elNextEpCountdownTime, elVideoSpeedSelect, elBtnVideoSubtitle,
+    elBtnSubtitleSettings, elSubtitleSettingsPanel, elBtnCloseSubSettings,
+    elSubSliderSize, elSubSliderY, elSubSizeVal, elSubYVal, elSubColorOptions, elSubBgOptions;
 
 // Module states
 let pendingSeekPosition = null;
@@ -64,6 +66,15 @@ function getElements() {
   elNextEpisodeCountdown = document.getElementById("next-episode-countdown");
   elNextEpCountdownTitle = document.getElementById("next-ep-countdown-title");
   elNextEpCountdownTime = document.getElementById("next-ep-countdown-time");
+  elBtnSubtitleSettings = document.getElementById("btn-subtitle-settings");
+  elSubtitleSettingsPanel = document.getElementById("subtitle-settings-panel");
+  elBtnCloseSubSettings = document.getElementById("btn-close-sub-settings");
+  elSubSliderSize = document.getElementById("sub-slider-size");
+  elSubSliderY = document.getElementById("sub-slider-y");
+  elSubSizeVal = document.getElementById("sub-size-val");
+  elSubYVal = document.getElementById("sub-y-val");
+  elSubColorOptions = document.getElementById("sub-color-options");
+  elSubBgOptions = document.getElementById("sub-bg-options");
 }
 
 function escapeHtml(str) {
@@ -231,6 +242,8 @@ export async function openVideoPlayer(fileName, options = {}) {
   getElements();
   if (!fileName) return;
   const shouldResume = options.resume !== false;
+
+  applySavedSubtitleSettings();
 
   if (elVideoSpeedSelect) elVideoSpeedSelect.value = "1";
   if (elMainVideo) elMainVideo.playbackRate = 1;
@@ -695,6 +708,9 @@ export function closeAllDropdowns() {
     elVideoSeasonDropdownList.classList.remove("opacity-100", "translate-y-0");
     elVideoSeasonDropdownList.classList.add("opacity-0", "pointer-events-none", "-translate-y-2");
   }
+  if (elSubtitleSettingsPanel) {
+    elSubtitleSettingsPanel.classList.add("hidden");
+  }
 
   document.querySelectorAll(".select-arrow-icon").forEach(icon => {
     icon.classList.remove("rotate-180");
@@ -973,4 +989,116 @@ export function setupVideoPlayerEvents() {
   document.addEventListener("click", () => {
     closeAllDropdowns();
   });
+
+  if (elBtnSubtitleSettings) {
+    elBtnSubtitleSettings.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isHidden = elSubtitleSettingsPanel.classList.contains("hidden");
+      closeAllDropdowns();
+      closeEpisodesPanel();
+      if (isHidden) {
+        elSubtitleSettingsPanel.classList.remove("hidden");
+      } else {
+        elSubtitleSettingsPanel.classList.add("hidden");
+      }
+    });
+  }
+
+  if (elBtnCloseSubSettings) {
+    elBtnCloseSubSettings.addEventListener("click", () => {
+      if (elSubtitleSettingsPanel) elSubtitleSettingsPanel.classList.add("hidden");
+    });
+  }
+
+  if (elSubtitleSettingsPanel) {
+    elSubtitleSettingsPanel.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  if (elSubSliderSize) {
+    elSubSliderSize.addEventListener("input", (e) => {
+      const val = e.target.value;
+      if (elSubSizeVal) elSubSizeVal.textContent = `${val}%`;
+      if (elMainVideo) elMainVideo.style.setProperty("--sub-size", `${val}%`);
+      localStorage.setItem("sub_size", val);
+    });
+  }
+
+  if (elSubSliderY) {
+    elSubSliderY.addEventListener("input", (e) => {
+      const val = e.target.value;
+      if (elSubYVal) elSubYVal.textContent = `${val}px`;
+      if (elMainVideo) elMainVideo.style.setProperty("--sub-y-offset", `${val}px`);
+      localStorage.setItem("sub_y_offset", val);
+    });
+  }
+
+  if (elSubColorOptions) {
+    elSubColorOptions.querySelectorAll(".sub-option-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        elSubColorOptions.querySelectorAll(".sub-option-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const color = btn.dataset.color;
+        if (elMainVideo) elMainVideo.style.setProperty("--sub-color", color);
+        localStorage.setItem("sub_color", color);
+      });
+    });
+  }
+
+  if (elSubBgOptions) {
+    elSubBgOptions.querySelectorAll(".sub-option-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        elSubBgOptions.querySelectorAll(".sub-option-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const bg = btn.dataset.bg;
+        if (elMainVideo) elMainVideo.style.setProperty("--sub-bg", bg);
+        localStorage.setItem("sub_bg", bg);
+      });
+    });
+  }
+}
+
+export function applySavedSubtitleSettings() {
+  getElements();
+  if (!elMainVideo) return;
+
+  const size = localStorage.getItem("sub_size") || "100";
+  const yOffset = localStorage.getItem("sub_y_offset") || "0";
+  const color = localStorage.getItem("sub_color") || "#ffffff";
+  const bg = localStorage.getItem("sub_bg") || "rgba(0, 0, 0, 0.6)";
+
+  elMainVideo.style.setProperty("--sub-size", `${size}%`);
+  elMainVideo.style.setProperty("--sub-y-offset", `${yOffset}px`);
+  elMainVideo.style.setProperty("--sub-color", color);
+  elMainVideo.style.setProperty("--sub-bg", bg);
+
+  if (elSubSliderSize) {
+    elSubSliderSize.value = size;
+    if (elSubSizeVal) elSubSizeVal.textContent = `${size}%`;
+  }
+  if (elSubSliderY) {
+    elSubSliderY.value = yOffset;
+    if (elSubYVal) elSubYVal.textContent = `${yOffset}px`;
+  }
+
+  if (elSubColorOptions) {
+    elSubColorOptions.querySelectorAll(".sub-option-btn").forEach(btn => {
+      if (btn.dataset.color === color) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+  }
+
+  if (elSubBgOptions) {
+    elSubBgOptions.querySelectorAll(".sub-option-btn").forEach(btn => {
+      if (btn.dataset.bg === bg) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+  }
 }

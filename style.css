@@ -829,3 +829,133 @@
     color: #f8a380 !important;
     transform: scale(1.03) !important;
 }
+
+/* ── Altyazı Özelleştirme Stilleri ──────────────────────────────── */
+#main-video-element::cue {
+    font-size: var(--sub-size, 20px) !important;
+    color: var(--sub-color, #ffffff) !important;
+    background: var(--sub-bg, rgba(0, 0, 0, 0.6)) !important;
+    font-family: 'Hanken Grotesk', sans-serif !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9) !important;
+}
+
+#main-video-element::-webkit-media-text-track-display {
+    overflow: visible !important;
+    transform: translateY(var(--sub-y-offset, 0px)) !important;
+    transition: transform 0.1s ease;
+}
+
+/* Altyazı Ayarları Paneli (Yarı Saydam Netflix Tarzı) */
+#subtitle-settings-panel {
+    position: absolute;
+    bottom: 85px;
+    right: 24px;
+    width: 280px;
+    background: rgba(12, 12, 12, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid #2f2f2f;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    z-index: 2200;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+#subtitle-settings-panel.hidden {
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+}
+
+.sub-settings-header {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #f8a380;
+    border-bottom: 1px solid #2f2f2f;
+    padding-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sub-settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sub-settings-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: 10px;
+    color: #8b9099;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sub-settings-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Range input özelleştirmeleri */
+.sub-settings-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #2b2b2b;
+    border-radius: 2px;
+    outline: none;
+}
+
+.sub-settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #f8a380;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.sub-settings-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* Renk ve Arka Plan Buton Grupları */
+.sub-options-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.sub-option-btn {
+    background: #222;
+    border: 1px solid #333;
+    color: #e5e5e5;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 6px 0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.sub-option-btn:hover {
+    border-color: #f8a380;
+    color: #f8a380;
+}
+
+.sub-option-btn.active {
+    background: rgba(248, 163, 128, 0.2);
+    border-color: #f8a380;
+    color: #f8a380;
+    font-weight: 700;
+}

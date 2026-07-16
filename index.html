@@ -344,6 +344,42 @@
                     <!-- Bölüm Listesi -->
                     <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-2 custom-scrollbar" id="video-episodes-list"></div>
                 </div>
+                
+                <!-- Altyazı Özelleştirme Ayar Paneli (Netflix Tarzı) -->
+                <div id="subtitle-settings-panel" class="hidden">
+                    <div class="sub-settings-header">
+                        <span>altyazi_ayarlari.</span>
+                        <button id="btn-close-sub-settings" class="text-on-surface-variant hover:text-on-surface flex items-center">
+                            <span class="material-symbols-outlined text-[14px]">close</span>
+                        </button>
+                    </div>
+                    <div class="sub-settings-group">
+                        <span class="sub-settings-label">Yazı Boyutu (<span id="sub-size-val">100%</span>)</span>
+                        <input type="range" id="sub-slider-size" min="70" max="200" step="5" value="100" class="sub-settings-slider"/>
+                    </div>
+                    <div class="sub-settings-group">
+                        <span class="sub-settings-label">Konum / Yükseklik (<span id="sub-y-val">0px</span>)</span>
+                        <input type="range" id="sub-slider-y" min="-120" max="20" step="5" value="0" class="sub-settings-slider"/>
+                    </div>
+                    <div class="sub-settings-group">
+                        <span class="sub-settings-label">Yazı Rengi</span>
+                        <div class="sub-options-grid" id="sub-color-options">
+                            <button class="sub-option-btn active" data-color="#ffffff">Beyaz</button>
+                            <button class="sub-option-btn" data-color="#ffff00">Sarı</button>
+                            <button class="sub-option-btn" data-color="#00ff00">Yeşil</button>
+                            <button class="sub-option-btn" data-color="#00ffff">Mavi</button>
+                        </div>
+                    </div>
+                    <div class="sub-settings-group">
+                        <span class="sub-settings-label">Arka Plan</span>
+                        <div class="sub-options-grid" id="sub-bg-options">
+                            <button class="sub-option-btn active" data-bg="rgba(0, 0, 0, 0.6)">Koyu</button>
+                            <button class="sub-option-btn" data-bg="rgba(0, 0, 0, 0.3)">Yarı</button>
+                            <button class="sub-option-btn" data-bg="rgba(0, 0, 0, 0.8)">Koyu+</button>
+                            <button class="sub-option-btn" data-bg="transparent">Yok</button>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Custom Controls Overlay -->
                 <div class="video-controls-overlay absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-6 flex flex-col gap-4 z-10" id="video-controls-overlay">
@@ -432,6 +468,11 @@
                                     <!-- Dinamik doldurulacak -->
                                 </div>
                             </div>
+                            
+                            <!-- Altyazı Ayarları Butonu -->
+                            <button id="btn-subtitle-settings" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Altyazı Ayarları">
+                                <span class="material-symbols-outlined">tune</span>
+                            </button>
                             <button id="btn-video-pip" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Picture in Picture">
                                 <span class="material-symbols-outlined">picture_in_picture_alt</span>
                             </button>

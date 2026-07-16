@@ -226,16 +226,29 @@ function renderLibraryGrid(files) {
       const episodes = librarySeriesIndex.get(meta.key);
       const sorted = episodes.slice().sort((a, b) => a.season - b.season || a.episode - b.episode);
       
-      // İzleme ilerlemesine göre oynatılacak sıradaki bölümü bulalım
-      let targetEp = sorted[0];
-      for (const ep of sorted) {
-        const pos = Number.parseFloat(localStorage.getItem(`playback_pos_${ep.name}`) || "0");
-        const dur = Number.parseFloat(localStorage.getItem(`playback_dur_${ep.name}`) || "0");
-        
-        // Eğer bu bölüm izlenmeye başlanmışsa ve henüz bitmemişse hedefimiz budur
-        if (pos > 5 && !isEpisodeNearlyFinished(pos, dur)) {
-          targetEp = ep;
-          break;
+      // En son oynatılan/açılan bölümü bulmaya çalışalım (Netflix tarzı bellek)
+      let targetEp = null;
+      try {
+        const progStr = localStorage.getItem(`series_prog_${meta.key}`);
+        if (progStr) {
+          const prog = JSON.parse(progStr);
+          if (prog && prog.fileName) {
+            targetEp = episodes.find(e => e.name === prog.fileName);
+          }
+        }
+      } catch (_) {}
+
+      // Eğer son izlenen bölüm bulunamazsa, izleme durumuna göre sıradaki tamamlanmamış bölümü bul
+      if (!targetEp) {
+        targetEp = sorted[0];
+        for (const ep of sorted) {
+          const pos = Number.parseFloat(localStorage.getItem(`playback_pos_${ep.name}`) || "0");
+          const dur = Number.parseFloat(localStorage.getItem(`playback_dur_${ep.name}`) || "0");
+          
+          if (pos > 5 && !isEpisodeNearlyFinished(pos, dur)) {
+            targetEp = ep;
+            break;
+          }
         }
       }
       
