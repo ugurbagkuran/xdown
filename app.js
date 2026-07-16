@@ -18,6 +18,7 @@ import {
   closeAllDropdowns,
   openVideoPlayer
 } from "./js/ui/videoPlayer.js";
+import { openEpisodePicker } from "./js/ui/episodePicker.js";
 import { apiSearch, apiGetDownloadsList } from "./js/services/api.js";
 
 // DOM Elements
@@ -154,11 +155,11 @@ async function fetchDownloadsList() {
 }
 
 function parseSeriesMeta(fileName) {
-  const match = fileName.match(/(.+?)\.S(\d+)E(\d+)\./i);
+  const match = fileName.match(/(.+?)[._\s-]S(\d+)E(\d+)(?:[._\s-]|$)/i);
   if (match) {
     return {
       key: match[1].toLowerCase().replace(/[^a-z0-9]/g, "_"),
-      seriesName: match[1].replace(/_/g, " "),
+      seriesName: match[1].replace(/[._]/g, " "),
       season: parseInt(match[2], 10),
       episode: parseInt(match[3], 10)
     };
@@ -248,8 +249,13 @@ function renderLibraryGrid(files) {
             <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container border border-outline/50 group-hover:border-primary-container/50 transition-colors">
               <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="/api/video-thumbnail?file=${encodeURIComponent(targetEp.name)}" alt="" onerror="this.src='https://via.placeholder.com/320x480/111/555?text=${encodeURIComponent(meta.seriesName)}'">
               <div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
-                <span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
-                <span class="font-mono text-[9px] text-on-surface-variant">${targetEp.season}. Sezon ${targetEp.episode}. Bölüm</span>
+                <button class="btn-show-episodes absolute top-3 right-3 z-30 p-2 bg-surface-container border border-outline hover:border-primary-container text-on-surface hover:text-primary-container rounded-lg transition-all flex items-center justify-center" title="Bölümleri Listele">
+                  <span class="material-symbols-outlined text-[18px]">playlist_play</span>
+                </button>
+                <div class="btn-play-series flex flex-col items-center gap-2 cursor-pointer z-20 hover:scale-105 transition-transform">
+                  <span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+                  <span class="font-mono text-[9px] text-on-surface-variant">${targetEp.season}. Sezon ${targetEp.episode}. Bölüm</span>
+                </div>
               </div>
               ${progressPct > 0 ? `<div class="absolute bottom-0 left-0 h-1.5 bg-primary-container transition-all" style="width: ${progressPct}%"></div>` : ""}
             </div>
@@ -309,6 +315,17 @@ function renderLibraryGrid(files) {
   if (elLibraryTotalCount) elLibraryTotalCount.textContent = String(filtered.length);
 
   elLibraryGrid.querySelectorAll(".library-card").forEach(card => {
+    const btnEpisodes = card.querySelector(".btn-show-episodes");
+    if (btnEpisodes) {
+      btnEpisodes.addEventListener("click", (e) => {
+        e.stopPropagation(); // Kartın genel tıklama olayını engelle (doğrudan oynatma eylemi)
+        const seriesKey = card.dataset.seriesKey;
+        const episodes = librarySeriesIndex.get(seriesKey) || [];
+        const seriesName = card.querySelector("h3").textContent;
+        openEpisodePicker(seriesKey, seriesName, episodes, openVideoPlayer);
+      });
+    }
+
     card.addEventListener("click", () => {
       const file = decodeURIComponent(card.dataset.file);
       openVideoPlayer(file);

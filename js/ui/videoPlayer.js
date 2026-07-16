@@ -11,7 +11,7 @@ let elMainVideo, elVideoPlayerModal, elVideoPlayerTitle, elVideoControlsOverlay,
     elBtnVideoSeasonPicker, elVideoSeasonDisplayValue, elVideoSeasonDropdownList,
     elSpeedDisplayValue, elSpeedDropdownList, elBtnVideoSpeed, elVideoTimelineWrapper,
     elBtnVideoNextEpCountdownPlay, elNextEpisodeCountdown, elNextEpCountdownTitle,
-    elNextEpCountdownTime;
+    elNextEpCountdownTime, elVideoSpeedSelect, elBtnVideoSubtitle;
 
 // Module states
 let pendingSeekPosition = null;
@@ -57,6 +57,8 @@ function getElements() {
   elSpeedDisplayValue = document.getElementById("speed-display-value");
   elSpeedDropdownList = document.getElementById("speed-dropdown-list");
   elBtnVideoSpeed = document.getElementById("btn-video-speed");
+  elVideoSpeedSelect = document.getElementById("video-speed-select");
+  elBtnVideoSubtitle = document.getElementById("btn-video-subtitle");
   elVideoTimelineWrapper = document.getElementById("video-timeline-wrapper");
   elBtnVideoNextEpCountdownPlay = document.getElementById("btn-next-ep-countdown-play");
   elNextEpisodeCountdown = document.getElementById("next-episode-countdown");
@@ -117,7 +119,7 @@ export function setSeriesProgress(seriesKey, season, episode, data = {}) {
 }
 
 export function parseSeriesMetaClient(fileName) {
-  const match = fileName.match(/(.+?)\.S(\d+)E(\d+)\./i);
+  const match = fileName.match(/(.+?)[._\s-]S(\d+)E(\d+)(?:[._\s-]|$)/i);
   if (match) {
     return {
       key: match[1].toLowerCase().replace(/[^a-z0-9]/g, "_"),

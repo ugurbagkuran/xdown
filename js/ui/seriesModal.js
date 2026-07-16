@@ -116,9 +116,9 @@ function renderEpisodes(episodes) {
     return `
       <div class="episode-row flex items-center justify-between p-3 bg-surface-container-low border border-outline/35 rounded-xl hover:border-primary-container/40 transition-all relative overflow-hidden" data-ep-url="${ep.url}">
         <div class="episode-progress-overlay absolute left-0 top-0 bottom-0 pointer-events-none transition-all duration-300" style="width: ${progressPct}%; background: rgba(255, 110, 64, 0.15)"></div>
-        <div class="episode-title flex flex-col z-10 min-w-0 pr-4">
-          <span class="text-xs font-bold text-on-surface truncate">${ep.name}</span>
-          <span class="text-[9px] text-on-surface-variant/60 font-mono mt-0.5">${ep.title}</span>
+        <div class="episode-title flex flex-col z-10 min-w-0 pr-4 flex-grow">
+          <span class="block text-xs font-bold text-on-surface truncate">${ep.name}</span>
+          <span class="block text-[9px] text-on-surface-variant/60 font-mono mt-0.5 truncate">${ep.title}</span>
         </div>
         <div class="episode-controls flex gap-2 z-10 shrink-0">
           <button class="ep-dl-btn px-4 py-1.5 bg-primary-container text-black font-bold rounded-full text-[10px] hover:bg-primary-fixed transition-colors flex items-center ${isActive ? "hidden" : ""}">
