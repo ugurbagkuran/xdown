@@ -437,42 +437,76 @@
                                 <option value="off">altyazi: kapali</option>
                             </select>
 
-                            <!-- Özel Oynatma Hızı Dropdown -->
-                            <div class="relative inline-block" id="speed-dropdown-wrapper">
-                                <button id="btn-video-speed" class="h-9 min-w-[95px] bg-black/40 border border-outline rounded-full px-3.5 font-mono text-[11px] text-on-surface hover:text-primary-container hover:border-primary-container transition-all flex items-center justify-between gap-1.5" title="Oynatma Hızı">
-                                    <span id="speed-display-value">hız: 1x</span>
-                                    <span class="material-symbols-outlined text-[14px] transition-transform select-arrow-icon" style="font-size: 14px;">keyboard_arrow_up</span>
-                                </button>
-                                <div id="speed-dropdown-list" class="absolute bottom-11 right-0 bg-black/95 border border-outline/30 rounded-xl py-2 shadow-2xl z-30 min-w-[100px] flex flex-col gap-1 transition-all opacity-0 pointer-events-none transform translate-y-2">
-                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="0.5">0.5x</button>
-                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="0.75">0.75x</button>
-                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors active" data-value="1">hız: 1x</button>
-                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="1.25">1.25x</button>
-                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="1.5">1.5x</button>
-                                    <button class="px-3 py-1.5 text-left font-mono text-[11px] text-on-surface hover:bg-white/5 hover:text-primary-container transition-colors" data-value="2">2x</button>
-                                </div>
-                            </div>
-                            
                             <!-- Bölümler Paneli Tetikleyici -->
                             <button id="btn-video-episodes" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all hidden" title="Bölümler">
                                 <span class="material-symbols-outlined">playlist_play</span>
                             </button>
 
-                            <!-- Özel Altyazı Dropdown -->
-                            <div class="relative inline-block" id="subtitle-dropdown-wrapper">
-                                <button id="btn-video-subtitle" class="h-9 min-w-[130px] bg-black/40 border border-outline rounded-full px-3.5 font-mono text-[11px] text-on-surface hover:text-primary-container hover:border-primary-container transition-all flex items-center justify-between gap-1.5" title="Altyazı">
-                                    <span id="subtitle-display-value">altyazi: kapali</span>
-                                    <span class="material-symbols-outlined text-[14px] transition-transform select-arrow-icon" style="font-size: 14px;">keyboard_arrow_up</span>
+                            <!-- YouTube Tarzı Birleşik Ayarlar Menüsü -->
+                            <div class="relative inline-block" id="settings-dropdown-wrapper">
+                                <button id="btn-video-settings" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Ayarlar">
+                                    <span class="material-symbols-outlined">settings</span>
                                 </button>
-                                <div id="subtitle-dropdown-list" class="absolute bottom-11 right-0 bg-black/95 border border-outline/30 rounded-xl py-2 shadow-2xl z-30 min-w-[140px] max-h-48 overflow-y-auto flex flex-col gap-1 transition-all opacity-0 pointer-events-none transform translate-y-2 custom-scrollbar">
-                                    <!-- Dinamik doldurulacak -->
+                                <div id="video-settings-menu" class="absolute bottom-12 right-0 bg-black/95 border border-outline/30 rounded-xl py-2 shadow-2xl z-30 min-w-[200px] flex flex-col transition-all opacity-0 pointer-events-none transform translate-y-2 text-on-surface">
+                                    
+                                    <!-- 1. Ana Panel -->
+                                    <div id="settings-main-panel" class="flex flex-col gap-0.5">
+                                        <button id="btn-submenu-speed" class="px-4 py-2.5 hover:bg-white/5 text-left text-xs flex justify-between items-center transition-colors">
+                                            <div class="flex items-center gap-2">
+                                                <span class="material-symbols-outlined text-[18px]">slow_motion_video</span>
+                                                <span>Oynatma Hızı</span>
+                                            </div>
+                                            <div class="flex items-center gap-0.5 text-primary-container font-mono text-[11px]">
+                                                <span id="menu-speed-val">1x</span>
+                                                <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                                            </div>
+                                        </button>
+                                        <button id="btn-submenu-subtitle" class="px-4 py-2.5 hover:bg-white/5 text-left text-xs flex justify-between items-center transition-colors">
+                                            <div class="flex items-center gap-2">
+                                                <span class="material-symbols-outlined text-[18px]">subtitles</span>
+                                                <span>Altyazı</span>
+                                            </div>
+                                            <div class="flex items-center gap-0.5 text-primary-container font-mono text-[11px]">
+                                                <span id="menu-subtitle-val">kapalı</span>
+                                                <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                                            </div>
+                                        </button>
+                                    </div>
+
+                                    <!-- 2. Hız Alt Paneli -->
+                                    <div id="settings-speed-panel" class="hidden flex flex-col gap-0.5">
+                                        <button id="btn-speed-back" class="px-3 py-2 border-b border-outline/10 text-left text-xs font-bold flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors">
+                                            <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                                            <span>Oynatma Hızı</span>
+                                        </button>
+                                        <div id="settings-speed-options" class="flex flex-col max-h-48 overflow-y-auto custom-scrollbar">
+                                            <button class="px-4 py-2 text-left text-xs font-mono hover:bg-white/5 hover:text-primary-container transition-colors" data-value="0.5">0.5x</button>
+                                            <button class="px-4 py-2 text-left text-xs font-mono hover:bg-white/5 hover:text-primary-container transition-colors" data-value="0.75">0.75x</button>
+                                            <button class="px-4 py-2 text-left text-xs font-mono hover:bg-white/5 hover:text-primary-container transition-colors active text-primary-container" data-value="1">1x (Normal)</button>
+                                            <button class="px-4 py-2 text-left text-xs font-mono hover:bg-white/5 hover:text-primary-container transition-colors" data-value="1.25">1.25x</button>
+                                            <button class="px-4 py-2 text-left text-xs font-mono hover:bg-white/5 hover:text-primary-container transition-colors" data-value="1.5">1.5x</button>
+                                            <button class="px-4 py-2 text-left text-xs font-mono hover:bg-white/5 hover:text-primary-container transition-colors" data-value="2">2x</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- 3. Altyazı Alt Paneli -->
+                                    <div id="settings-subtitle-panel" class="hidden flex flex-col gap-0.5">
+                                        <button id="btn-subtitle-back" class="px-3 py-2 border-b border-outline/10 text-left text-xs font-bold flex items-center gap-1 text-on-surface-variant hover:text-on-surface transition-colors">
+                                            <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                                            <span>Altyazı</span>
+                                        </button>
+                                        <div id="settings-subtitle-options" class="flex flex-col max-h-40 overflow-y-auto custom-scrollbar">
+                                            <!-- Dinamik doldurulacak -->
+                                        </div>
+                                        <button id="btn-submenu-subtitle-settings" class="px-4 py-2 mt-1 border-t border-outline/10 hover:bg-white/5 text-left text-xs text-on-surface-variant hover:text-primary-container flex items-center gap-2 transition-colors">
+                                            <span class="material-symbols-outlined text-[18px]">tune</span>
+                                            <span>Altyazı Seçenekleri</span>
+                                        </button>
+                                    </div>
+
                                 </div>
                             </div>
                             
-                            <!-- Altyazı Ayarları Butonu -->
-                            <button id="btn-subtitle-settings" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Altyazı Ayarları">
-                                <span class="material-symbols-outlined">tune</span>
-                            </button>
                             <button id="btn-video-pip" class="w-10 h-10 flex items-center justify-center text-on-background hover:text-primary-container hover:bg-white/5 border border-transparent hover:border-outline rounded-full transition-all" title="Picture in Picture">
                                 <span class="material-symbols-outlined">picture_in_picture_alt</span>
                             </button>

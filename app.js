@@ -12,11 +12,12 @@ import {
   showSeriesDetails, 
   registerProgressRefreshCallback 
 } from "./js/ui/seriesModal.js";
-import { 
+import {
   setupVideoPlayerEvents, 
   registerLibraryData, 
   closeAllDropdowns,
-  openVideoPlayer
+  openVideoPlayer,
+  registerPlayerCloseCallback
 } from "./js/ui/videoPlayer.js";
 import { openEpisodePicker } from "./js/ui/episodePicker.js";
 import { apiSearch, apiGetDownloadsList } from "./js/services/api.js";
@@ -233,7 +234,22 @@ function renderLibraryGrid(files) {
         if (progStr) {
           const prog = JSON.parse(progStr);
           if (prog && prog.fileName) {
-            targetEp = episodes.find(e => e.name === prog.fileName);
+            const foundEp = episodes.find(e => e.name === prog.fileName);
+            if (foundEp) {
+              const pos = prog.position || 0;
+              const dur = prog.duration || 0;
+              if (isEpisodeNearlyFinished(pos, dur)) {
+                // Eğer son izlenen bölüm bitmişse, bir sonraki bölümü bulmaya çalış
+                const currentIndex = sorted.findIndex(e => e.name === prog.fileName);
+                if (currentIndex !== -1 && currentIndex < sorted.length - 1) {
+                  targetEp = sorted[currentIndex + 1];
+                } else {
+                  targetEp = foundEp; // Son bölüm ise kendisi kalsın
+                }
+              } else {
+                targetEp = foundEp; // Yarım kalmışsa doğrudan o bölüm
+              }
+            }
           }
         }
       } catch (_) {}
@@ -245,7 +261,7 @@ function renderLibraryGrid(files) {
           const pos = Number.parseFloat(localStorage.getItem(`playback_pos_${ep.name}`) || "0");
           const dur = Number.parseFloat(localStorage.getItem(`playback_dur_${ep.name}`) || "0");
           
-          if (pos > 5 && !isEpisodeNearlyFinished(pos, dur)) {
+          if (!isEpisodeNearlyFinished(pos, dur)) {
             targetEp = ep;
             break;
           }
@@ -362,6 +378,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // Bind download callbacks
   registerDownloadsCallback(fetchDownloadsList);
   registerProgressRefreshCallback(renderLibrary);
+  registerPlayerCloseCallback(fetchDownloadsList);
 
   // Initial downloads fetch
   fetchDownloadsList();

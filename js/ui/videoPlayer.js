@@ -5,15 +5,20 @@ let elMainVideo, elVideoPlayerModal, elVideoPlayerTitle, elVideoControlsOverlay,
     elVideoGiantIndicator, elVideoTimelineFill, elVideoTimelineHandle, elVideoTimelineBg,
     elVideoCurrentTime, elVideoDuration, elBtnVideoPlay, elBtnVideoRewind, elBtnVideoForward,
     elBtnVideoNextEp, elBtnVideoMute, elVideoVolumeSlider, elVideoSubtitleSelect,
-    elSubtitleDisplayValue, elSubtitleDropdownList, elBtnCloseVideo, elBtnVideoPip,
+    elBtnCloseVideo, elBtnVideoPip,
     elBtnVideoFullscreen, elVideoEpisodesPanel, elVideoEpisodesList, elVideoEpisodesSeasonSelect,
     elVideoEpisodesSeasonContainer, elBtnVideoEpisodes, elBtnCloseEpisodesPanel,
     elBtnVideoSeasonPicker, elVideoSeasonDisplayValue, elVideoSeasonDropdownList,
-    elSpeedDisplayValue, elSpeedDropdownList, elBtnVideoSpeed, elVideoTimelineWrapper,
+    elVideoSpeedSelect, elVideoTimelineWrapper,
     elBtnVideoNextEpCountdownPlay, elNextEpisodeCountdown, elNextEpCountdownTitle,
-    elNextEpCountdownTime, elVideoSpeedSelect, elBtnVideoSubtitle,
-    elBtnSubtitleSettings, elSubtitleSettingsPanel, elBtnCloseSubSettings,
-    elSubSliderSize, elSubSliderY, elSubSizeVal, elSubYVal, elSubColorOptions, elSubBgOptions;
+    elNextEpCountdownTime, 
+    elSubtitleSettingsPanel, elBtnCloseSubSettings,
+    elSubSliderSize, elSubSliderY, elSubSizeVal, elSubYVal, elSubColorOptions, elSubBgOptions,
+    // Yeni ayar menüsü elemanları
+    elBtnVideoSettings, elVideoSettingsMenu, elSettingsMainPanel, elSettingsSpeedPanel,
+    elSettingsSubtitlePanel, elBtnSubmenuSpeed, elBtnSubmenuSubtitle, elMenuSpeedVal,
+    elMenuSubtitleVal, elBtnSpeedBack, elBtnSubtitleBack, elSettingsSpeedOptions,
+    elSettingsSubtitleOptions, elBtnSubmenuSubtitleSettings;
 
 // Module states
 let pendingSeekPosition = null;
@@ -23,6 +28,7 @@ let nextEpisodeCountdownTimer = null;
 let librarySeriesIndex = new Map(); // seriesKey -> [episodes]
 let libraryFiles = []; // Array of downloaded files
 let seriesProgressIndex = new Map(); // seriesKey -> { season, episode, position, duration, fileName }
+let playerCloseCallback = null;
 
 function getElements() {
   elMainVideo = document.getElementById("main-video-element");
@@ -42,8 +48,6 @@ function getElements() {
   elBtnVideoMute = document.getElementById("btn-video-mute");
   elVideoVolumeSlider = document.getElementById("video-volume-slider");
   elVideoSubtitleSelect = document.getElementById("video-subtitle-select");
-  elSubtitleDisplayValue = document.getElementById("subtitle-display-value");
-  elSubtitleDropdownList = document.getElementById("subtitle-dropdown-list");
   elBtnCloseVideo = document.getElementById("btn-close-video");
   elBtnVideoPip = document.getElementById("btn-video-pip");
   elBtnVideoFullscreen = document.getElementById("btn-video-fullscreen");
@@ -56,17 +60,12 @@ function getElements() {
   elBtnVideoSeasonPicker = document.getElementById("btn-video-season-picker");
   elVideoSeasonDisplayValue = document.getElementById("video-season-display-value");
   elVideoSeasonDropdownList = document.getElementById("video-season-dropdown-list");
-  elSpeedDisplayValue = document.getElementById("speed-display-value");
-  elSpeedDropdownList = document.getElementById("speed-dropdown-list");
-  elBtnVideoSpeed = document.getElementById("btn-video-speed");
   elVideoSpeedSelect = document.getElementById("video-speed-select");
-  elBtnVideoSubtitle = document.getElementById("btn-video-subtitle");
   elVideoTimelineWrapper = document.getElementById("video-timeline-wrapper");
   elBtnVideoNextEpCountdownPlay = document.getElementById("btn-next-ep-countdown-play");
   elNextEpisodeCountdown = document.getElementById("next-episode-countdown");
   elNextEpCountdownTitle = document.getElementById("next-ep-countdown-title");
   elNextEpCountdownTime = document.getElementById("next-ep-countdown-time");
-  elBtnSubtitleSettings = document.getElementById("btn-subtitle-settings");
   elSubtitleSettingsPanel = document.getElementById("subtitle-settings-panel");
   elBtnCloseSubSettings = document.getElementById("btn-close-sub-settings");
   elSubSliderSize = document.getElementById("sub-slider-size");
@@ -75,6 +74,22 @@ function getElements() {
   elSubYVal = document.getElementById("sub-y-val");
   elSubColorOptions = document.getElementById("sub-color-options");
   elSubBgOptions = document.getElementById("sub-bg-options");
+
+  // Yeni ayar menüsü elemanları
+  elBtnVideoSettings = document.getElementById("btn-video-settings");
+  elVideoSettingsMenu = document.getElementById("video-settings-menu");
+  elSettingsMainPanel = document.getElementById("settings-main-panel");
+  elSettingsSpeedPanel = document.getElementById("settings-speed-panel");
+  elSettingsSubtitlePanel = document.getElementById("settings-subtitle-panel");
+  elBtnSubmenuSpeed = document.getElementById("btn-submenu-speed");
+  elBtnSubmenuSubtitle = document.getElementById("btn-submenu-subtitle");
+  elMenuSpeedVal = document.getElementById("menu-speed-val");
+  elMenuSubtitleVal = document.getElementById("menu-subtitle-val");
+  elBtnSpeedBack = document.getElementById("btn-speed-back");
+  elBtnSubtitleBack = document.getElementById("btn-subtitle-back");
+  elSettingsSpeedOptions = document.getElementById("settings-speed-options");
+  elSettingsSubtitleOptions = document.getElementById("settings-subtitle-options");
+  elBtnSubmenuSubtitleSettings = document.getElementById("btn-submenu-subtitle-settings");
 }
 
 function escapeHtml(str) {
@@ -146,14 +161,20 @@ function isEpisodeNearlyFinished(current, total) {
   return total - current < 30; // Son 30 saniye kaldıysa bitmiş sayılır
 }
 
-function resetVideoSubtitleSelect(placeholderText = "altyazi: kapali") {
+function resetVideoSubtitleSelect(placeholderText = "kapalı") {
   if (!elVideoSubtitleSelect) return;
   elVideoSubtitleSelect.innerHTML = `<option value="off">${placeholderText}</option>`;
   elVideoSubtitleSelect.disabled = true;
   elVideoSubtitleSelect.value = "off";
 
-  if (elSubtitleDropdownList) {
-    elSubtitleDropdownList.innerHTML = `<button class="active" data-value="off">${placeholderText}</button>`;
+  const elSettingsSubtitleOptions = document.getElementById("settings-subtitle-options");
+  const elMenuSubtitleVal = document.getElementById("menu-subtitle-val");
+
+  if (elSettingsSubtitleOptions) {
+    elSettingsSubtitleOptions.innerHTML = `<button class="px-4 py-2 text-left text-xs hover:bg-white/5 hover:text-primary-container transition-colors active text-primary-container" data-value="off">${placeholderText}</button>`;
+  }
+  if (elMenuSubtitleVal) {
+    elMenuSubtitleVal.textContent = placeholderText;
   }
 }
 
@@ -176,21 +197,24 @@ function applySelectedSubtitleTrack(val) {
 }
 
 async function loadVideoSubtitles(fileName) {
-  resetVideoSubtitleSelect("altyazi: araniyor...");
+  resetVideoSubtitleSelect("aranıyor...");
   clearVideoSubtitleTracks();
 
   try {
     const data = await apiGetVideoSubtitles(fileName);
+    const elSettingsSubtitleOptions = document.getElementById("settings-subtitle-options");
+    const elMenuSubtitleVal = document.getElementById("menu-subtitle-val");
+
     if (!data.success || !Array.isArray(data.subtitles) || data.subtitles.length === 0) {
-      resetVideoSubtitleSelect("altyazi: yok");
+      resetVideoSubtitleSelect("yok");
       return;
     }
 
-    elVideoSubtitleSelect.innerHTML = `<option value="off">altyazi: kapali</option>`;
+    elVideoSubtitleSelect.innerHTML = `<option value="off">kapali</option>`;
     data.subtitles.forEach((sub, index) => {
       const option = document.createElement("option");
       option.value = String(index);
-      option.textContent = `altyazi: ${sub.label || sub.lang || `sub${index + 1}`}`;
+      option.textContent = sub.label || sub.lang || `sub${index + 1}`;
       elVideoSubtitleSelect.appendChild(option);
 
       const track = document.createElement("track");
@@ -201,40 +225,42 @@ async function loadVideoSubtitles(fileName) {
       elMainVideo.appendChild(track);
     });
 
-    if (elSubtitleDropdownList) {
-      let subHtml = `<button class="active" data-value="off">altyazi: kapali</button>`;
+    if (elSettingsSubtitleOptions) {
+      let subHtml = `<button class="px-4 py-2 text-left text-xs hover:bg-white/5 hover:text-primary-container transition-colors active text-primary-container" data-value="off">Kapalı</button>`;
       data.subtitles.forEach((sub, index) => {
-        const text = `altyazi: ${sub.label || sub.lang || `sub${index + 1}`}`;
-        subHtml += `<button data-value="${index}">${escapeHtml(text)}</button>`;
+        const text = sub.label || sub.lang || `Altyazı ${index + 1}`;
+        subHtml += `<button class="px-4 py-2 text-left text-xs hover:bg-white/5 hover:text-primary-container transition-colors" data-value="${index}">${escapeHtml(text)}</button>`;
       });
-      elSubtitleDropdownList.innerHTML = subHtml;
+      elSettingsSubtitleOptions.innerHTML = subHtml;
 
-      elSubtitleDropdownList.querySelectorAll("button").forEach(btn => {
+      elSettingsSubtitleOptions.querySelectorAll("button").forEach(btn => {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           const val = btn.dataset.value;
           
-          elSubtitleDropdownList.querySelectorAll("button").forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
+          elSettingsSubtitleOptions.querySelectorAll("button").forEach(b => {
+            b.classList.remove("active", "text-primary-container");
+          });
+          btn.classList.add("active", "text-primary-container");
           
           if (elVideoSubtitleSelect) {
             elVideoSubtitleSelect.value = val;
             elVideoSubtitleSelect.dispatchEvent(new Event("change"));
           }
           
-          if (elSubtitleDisplayValue) elSubtitleDisplayValue.textContent = btn.textContent;
-          closeAllDropdowns();
+          if (elMenuSubtitleVal) elMenuSubtitleVal.textContent = btn.textContent;
+          closeSettingsSubmenus();
         });
       });
     }
 
     elVideoSubtitleSelect.disabled = false;
     elVideoSubtitleSelect.value = "off";
-    if (elSubtitleDisplayValue) elSubtitleDisplayValue.textContent = "altyazi: kapali";
+    if (elMenuSubtitleVal) elMenuSubtitleVal.textContent = "kapalı";
     applySelectedSubtitleTrack("off");
   } catch (err) {
     console.error("Altyazı listesi yüklenemedi:", err);
-    resetVideoSubtitleSelect("altyazi: yuklenemedi");
+    resetVideoSubtitleSelect("yüklenemedi");
   }
 }
 
@@ -335,6 +361,10 @@ export function closeVideoPlayer() {
   resetVideoSubtitleSelect();
   clearTimeout(controlsTimeout);
   document.removeEventListener("keydown", handleVideoKeydown);
+
+  if (playerCloseCallback) {
+    try { playerCloseCallback(); } catch (_) {}
+  }
 }
 
 function triggerGiantPlayIndicator(isPlay) {
@@ -650,33 +680,26 @@ function saveCurrentPlaybackProgress(isClose = false) {
 }
 
 // Custom dropdowns management
-function toggleSpeedDropdown() {
-  if (!elSpeedDropdownList) return;
-  if (activeDropdown === "speed") {
-    closeAllDropdowns();
-  } else {
-    closeAllDropdowns();
-    elSpeedDropdownList.classList.remove("opacity-0", "pointer-events-none", "translate-y-2");
-    elSpeedDropdownList.classList.add("opacity-100", "translate-y-0");
-    if (elBtnVideoSpeed) {
-      elBtnVideoSpeed.querySelector(".select-arrow-icon").classList.add("rotate-180");
-    }
-    activeDropdown = "speed";
-  }
+function closeSettingsSubmenus() {
+  const elMainPanel = document.getElementById("settings-main-panel");
+  const elSpeedPanel = document.getElementById("settings-speed-panel");
+  const elSubtitlePanel = document.getElementById("settings-subtitle-panel");
+
+  if (elMainPanel) elMainPanel.classList.remove("hidden");
+  if (elSpeedPanel) elSpeedPanel.classList.add("hidden");
+  if (elSubtitlePanel) elSubtitlePanel.classList.add("hidden");
 }
 
-function toggleSubtitleDropdown() {
-  if (!elSubtitleDropdownList) return;
-  if (activeDropdown === "subtitle") {
+function toggleSettingsDropdown() {
+  if (!elVideoSettingsMenu) return;
+  
+  if (activeDropdown === "settings") {
     closeAllDropdowns();
   } else {
     closeAllDropdowns();
-    elSubtitleDropdownList.classList.remove("opacity-0", "pointer-events-none", "translate-y-2");
-    elSubtitleDropdownList.classList.add("opacity-100", "translate-y-0");
-    if (elBtnVideoSubtitle) {
-      elBtnVideoSubtitle.querySelector(".select-arrow-icon").classList.add("rotate-180");
-    }
-    activeDropdown = "subtitle";
+    elVideoSettingsMenu.classList.remove("opacity-0", "pointer-events-none", "translate-y-2");
+    elVideoSettingsMenu.classList.add("opacity-100", "translate-y-0");
+    activeDropdown = "settings";
   }
 }
 
@@ -696,14 +719,12 @@ function toggleSeasonDropdown() {
 }
 
 export function closeAllDropdowns() {
-  if (elSpeedDropdownList) {
-    elSpeedDropdownList.classList.remove("opacity-100", "translate-y-0");
-    elSpeedDropdownList.classList.add("opacity-0", "pointer-events-none", "translate-y-2");
+  if (elVideoSettingsMenu) {
+    elVideoSettingsMenu.classList.remove("opacity-100", "translate-y-0");
+    elVideoSettingsMenu.classList.add("opacity-0", "pointer-events-none", "translate-y-2");
   }
-  if (elSubtitleDropdownList) {
-    elSubtitleDropdownList.classList.remove("opacity-100", "translate-y-0");
-    elSubtitleDropdownList.classList.add("opacity-0", "pointer-events-none", "translate-y-2");
-  }
+  closeSettingsSubmenus();
+
   if (elVideoSeasonDropdownList) {
     elVideoSeasonDropdownList.classList.remove("opacity-100", "translate-y-0");
     elVideoSeasonDropdownList.classList.add("opacity-0", "pointer-events-none", "-translate-y-2");
@@ -720,6 +741,10 @@ export function closeAllDropdowns() {
 }
 
 // Initial setup triggers
+export function registerPlayerCloseCallback(callback) {
+  playerCloseCallback = callback;
+}
+
 export function registerLibraryData(files, seriesIndex) {
   libraryFiles = files;
   librarySeriesIndex = seriesIndex;
@@ -921,36 +946,85 @@ export function setupVideoPlayerEvents() {
     });
   }
 
-  if (elBtnVideoSpeed) {
-    elBtnVideoSpeed.addEventListener("click", (e) => {
+  // Yeni Ayarlar Menüsü Olayları
+  if (elBtnVideoSettings) {
+    elBtnVideoSettings.addEventListener("click", (e) => {
       e.stopPropagation();
-      toggleSpeedDropdown();
+      toggleSettingsDropdown();
     });
   }
 
-  if (elSpeedDropdownList) {
-    elSpeedDropdownList.querySelectorAll("button").forEach(btn => {
+  if (elVideoSettingsMenu) {
+    elVideoSettingsMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  if (elBtnSubmenuSpeed) {
+    elBtnSubmenuSpeed.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (elSettingsMainPanel) elSettingsMainPanel.classList.add("hidden");
+      if (elSettingsSpeedPanel) elSettingsSpeedPanel.classList.remove("hidden");
+    });
+  }
+
+  if (elBtnSubmenuSubtitle) {
+    elBtnSubmenuSubtitle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (elSettingsMainPanel) elSettingsMainPanel.classList.add("hidden");
+      if (elSettingsSubtitlePanel) elSettingsSubtitlePanel.classList.remove("hidden");
+    });
+  }
+
+  if (elBtnSpeedBack) {
+    elBtnSpeedBack.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (elSettingsSpeedPanel) elSettingsSpeedPanel.classList.add("hidden");
+      if (elSettingsMainPanel) elSettingsMainPanel.classList.remove("hidden");
+    });
+  }
+
+  if (elBtnSubtitleBack) {
+    elBtnSubtitleBack.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (elSettingsSubtitlePanel) elSettingsSubtitlePanel.classList.add("hidden");
+      if (elSettingsMainPanel) elSettingsMainPanel.classList.remove("hidden");
+    });
+  }
+
+  if (elSettingsSpeedOptions) {
+    elSettingsSpeedOptions.querySelectorAll("button").forEach(btn => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const val = btn.dataset.value;
-        elSpeedDropdownList.querySelectorAll("button").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
+        elSettingsSpeedOptions.querySelectorAll("button").forEach(b => {
+          b.classList.remove("active", "text-primary-container");
+        });
+        btn.classList.add("active", "text-primary-container");
+
         if (elVideoSpeedSelect) {
           elVideoSpeedSelect.value = val;
           elVideoSpeedSelect.dispatchEvent(new Event("change"));
         }
-        if (elSpeedDisplayValue) {
-          elSpeedDisplayValue.textContent = val === "1" ? "hız: 1x" : `${val}x`;
+        if (elMenuSpeedVal) {
+          elMenuSpeedVal.textContent = val === "1" ? "1x" : `${val}x`;
         }
         closeAllDropdowns();
       });
     });
   }
 
-  if (elBtnVideoSubtitle) {
-    elBtnVideoSubtitle.addEventListener("click", (e) => {
+  if (elBtnSubmenuSubtitleSettings) {
+    elBtnSubmenuSubtitleSettings.addEventListener("click", (e) => {
       e.stopPropagation();
-      toggleSubtitleDropdown();
+      const isHidden = elSubtitleSettingsPanel.classList.contains("hidden");
+      closeAllDropdowns();
+      closeEpisodesPanel();
+      if (isHidden) {
+        elSubtitleSettingsPanel.classList.remove("hidden");
+      } else {
+        elSubtitleSettingsPanel.classList.add("hidden");
+      }
     });
   }
 
@@ -989,20 +1063,6 @@ export function setupVideoPlayerEvents() {
   document.addEventListener("click", () => {
     closeAllDropdowns();
   });
-
-  if (elBtnSubtitleSettings) {
-    elBtnSubtitleSettings.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const isHidden = elSubtitleSettingsPanel.classList.contains("hidden");
-      closeAllDropdowns();
-      closeEpisodesPanel();
-      if (isHidden) {
-        elSubtitleSettingsPanel.classList.remove("hidden");
-      } else {
-        elSubtitleSettingsPanel.classList.add("hidden");
-      }
-    });
-  }
 
   if (elBtnCloseSubSettings) {
     elBtnCloseSubSettings.addEventListener("click", () => {
