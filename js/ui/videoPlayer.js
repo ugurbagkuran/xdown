@@ -29,6 +29,7 @@ let librarySeriesIndex = new Map(); // seriesKey -> [episodes]
 let libraryFiles = []; // Array of downloaded files
 let seriesProgressIndex = new Map(); // seriesKey -> { season, episode, position, duration, fileName }
 let playerCloseCallback = null;
+let currentPlayingFile = null;
 
 function getElements() {
   elMainVideo = document.getElementById("main-video-element");
@@ -145,14 +146,32 @@ export function setSeriesProgress(seriesKey, season, episode, data = {}) {
 }
 
 export function parseSeriesMetaClient(fileName) {
-  const match = fileName.match(/(.+?)[._\s-]S(\d+)E(\d+)(?:[._\s-]|$)/i);
-  if (match) {
+  if (!fileName) return null;
+  
+  const sPattern = /^(?:(.+?)[._\s-])?S(\d+)E(\d+)(?:[._\s-]|$)/i;
+  const matchS = fileName.match(sPattern);
+  if (matchS) {
+    const rawName = matchS[1] ? matchS[1].replace(/[._-]/g, " ").trim() : "Dizi";
     return {
-      key: match[1].toLowerCase().replace(/[^a-z0-9]/g, "_"),
-      season: parseInt(match[2], 10),
-      episode: parseInt(match[3], 10)
+      key: (matchS[1] || "dizi").toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/^_+|_+$/g, ""),
+      seriesName: rawName || "Dizi",
+      season: parseInt(matchS[2], 10),
+      episode: parseInt(matchS[3], 10)
     };
   }
+
+  const trPattern = /^(?:(.+?)[._\s-])?(\d+)[._\s]*(?:sezon|sez|s)[._\s]*(\d+)[._\s]*(?:bolum|bölüm|bol|b)(?:[._\s-]|$)/i;
+  const matchTr = fileName.match(trPattern);
+  if (matchTr) {
+    const rawName = matchTr[1] ? matchTr[1].replace(/[._-]/g, " ").trim() : "Dizi";
+    return {
+      key: (matchTr[1] || "dizi").toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/^_+|_+$/g, ""),
+      seriesName: rawName || "Dizi",
+      season: parseInt(matchTr[2], 10),
+      episode: parseInt(matchTr[3], 10)
+    };
+  }
+
   return null;
 }
 
@@ -267,6 +286,7 @@ async function loadVideoSubtitles(fileName) {
 export async function openVideoPlayer(fileName, options = {}) {
   getElements();
   if (!fileName) return;
+  currentPlayingFile = fileName;
   const shouldResume = options.resume !== false;
 
   applySavedSubtitleSettings();
@@ -673,8 +693,8 @@ async function resolvePlayableVideoSrc(fileName) {
 }
 
 function saveCurrentPlaybackProgress(isClose = false) {
-  if (!elMainVideo || !elVideoPlayerTitle || elVideoPlayerModal.classList.contains("hidden")) return;
-  const fileName = elVideoPlayerTitle.textContent;
+  if (!elMainVideo || !currentPlayingFile || elVideoPlayerModal.classList.contains("hidden")) return;
+  const fileName = currentPlayingFile;
   const current = elMainVideo.currentTime;
   const duration = elMainVideo.duration;
 
@@ -837,14 +857,15 @@ export function setupVideoPlayerEvents() {
     });
 
     elMainVideo.addEventListener("ended", () => {
-      if (elVideoPlayerTitle && Number.isFinite(elMainVideo.duration)) {
-        setPlaybackPositionForFile(elVideoPlayerTitle.textContent, elMainVideo.duration, elMainVideo.duration);
-        const meta = parseSeriesMetaClient(elVideoPlayerTitle.textContent);
+      const finishedFile = currentPlayingFile;
+      if (finishedFile && Number.isFinite(elMainVideo.duration)) {
+        setPlaybackPositionForFile(finishedFile, elMainVideo.duration, elMainVideo.duration);
+        const meta = parseSeriesMetaClient(finishedFile);
         if (meta) {
           setSeriesProgress(meta.key, meta.season, meta.episode, {
             position: elMainVideo.duration,
             duration: elMainVideo.duration,
-            fileName: elVideoPlayerTitle.textContent,
+            fileName: finishedFile,
           });
         }
       }
