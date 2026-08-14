@@ -96,3 +96,35 @@ export async function apiSelectFolder() {
   const res = await fetch("/api/select-folder");
   return await res.json();
 }
+
+export async function apiDeleteFile(file) {
+  const res = await fetch("/api/delete-file", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file })
+  });
+  return await res.json();
+}
+
+export async function apiDeleteSeries(files) {
+  const res = await fetch("/api/delete-series", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files })
+  });
+  return await res.json();
+}
+
+export async function apiOpenFolder(file = "") {
+  const res = await fetch("/api/open-folder", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file })
+  });
+  return await res.json();
+}
+
+export async function apiGetStorageInfo() {
+  const res = await fetch("/api/storage-info");
+  return await res.json();
+}

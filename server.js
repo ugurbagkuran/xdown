@@ -916,6 +916,153 @@ app.get("/api/stream-ts", async (req, res) => {
   });
 });
 
+// Format bytes utility
+function formatBytes(bytes, decimals = 1) {
+  if (!+bytes || bytes <= 0) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
+// 1. Delete single file and its subtitles/cache
+app.post("/api/delete-file", (req, res) => {
+  try {
+    const { file } = req.body;
+    if (!file) {
+      return res.status(400).json({ success: false, error: "Dosya adı belirtilmedi." });
+    }
+
+    const resolved = resolveDownloadFilePath(file);
+    if (!resolved) {
+      return res.status(400).json({ success: false, error: "Geçersiz dosya adı veya konumu." });
+    }
+
+    const { filePath } = resolved;
+    let deleted = false;
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      deleted = true;
+    }
+
+    // Altyazı dosyasını da temizle
+    const ext = path.extname(filePath);
+    const baseWithoutExt = filePath.slice(0, -ext.length);
+    const subVtt = `${baseWithoutExt}.vtt`;
+    const subSrt = `${baseWithoutExt}.srt`;
+    if (fs.existsSync(subVtt)) fs.unlinkSync(subVtt);
+    if (fs.existsSync(subSrt)) fs.unlinkSync(subSrt);
+
+    res.json({ success: true, message: "Dosya başarıyla silindi.", deleted });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Delete entire series episodes
+app.post("/api/delete-series", (req, res) => {
+  try {
+    const { files } = req.body;
+    if (!Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ success: false, error: "Silinecek dosya listesi belirtilmedi." });
+    }
+
+    let deletedCount = 0;
+    for (const file of files) {
+      const resolved = resolveDownloadFilePath(file);
+      if (resolved && fs.existsSync(resolved.filePath)) {
+        try {
+          fs.unlinkSync(resolved.filePath);
+          deletedCount++;
+          const ext = path.extname(resolved.filePath);
+          const baseWithoutExt = resolved.filePath.slice(0, -ext.length);
+          const subVtt = `${baseWithoutExt}.vtt`;
+          const subSrt = `${baseWithoutExt}.srt`;
+          if (fs.existsSync(subVtt)) fs.unlinkSync(subVtt);
+          if (fs.existsSync(subSrt)) fs.unlinkSync(subSrt);
+        } catch (_) {}
+      }
+    }
+
+    res.json({ success: true, deletedCount, message: `${deletedCount} dosya silindi.` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Open file location in Windows Explorer / OS file manager
+app.post("/api/open-folder", async (req, res) => {
+  try {
+    const { file } = req.body;
+    const downloadsDir = path.resolve(appSettings.downloadsDir || "./downloads");
+    const { exec } = await import("child_process");
+
+    if (file) {
+      const resolved = resolveDownloadFilePath(file);
+      if (resolved && fs.existsSync(resolved.filePath)) {
+        const fullPath = resolved.filePath.replace(/\//g, "\\");
+        exec(`explorer.exe /select,"${fullPath}"`);
+        return res.json({ success: true, message: "Dosya konumu açıldı." });
+      }
+    }
+
+    // Dosya yoksa veya genel açma ise klasörü aç
+    const dirPath = downloadsDir.replace(/\//g, "\\");
+    exec(`explorer.exe "${dirPath}"`);
+    res.json({ success: true, message: "Klasör açıldı." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Storage & disk info
+app.get("/api/storage-info", (req, res) => {
+  try {
+    const downloadsDir = path.resolve(appSettings.downloadsDir || "./downloads");
+    if (!fs.existsSync(downloadsDir)) {
+      fs.mkdirSync(downloadsDir, { recursive: true });
+    }
+
+    // Calculate library size
+    let libraryBytes = 0;
+    const files = fs.readdirSync(downloadsDir);
+    for (const f of files) {
+      try {
+        const stat = fs.statSync(path.join(downloadsDir, f));
+        if (stat.isFile()) {
+          libraryBytes += stat.size;
+        }
+      } catch (_) {}
+    }
+
+    // Calculate disk free space
+    let freeBytes = 0;
+    let totalDiskBytes = 0;
+    if (typeof fs.statfsSync === "function") {
+      try {
+        const statfs = fs.statfsSync(downloadsDir);
+        freeBytes = statfs.bavail * statfs.bsize;
+        totalDiskBytes = statfs.blocks * statfs.bsize;
+      } catch (_) {}
+    }
+
+    res.json({
+      success: true,
+      downloadsDir,
+      libraryBytes,
+      libraryFormatted: formatBytes(libraryBytes),
+      freeBytes,
+      freeFormatted: formatBytes(freeBytes),
+      totalDiskBytes,
+      totalDiskFormatted: formatBytes(totalDiskBytes)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.use("/downloads", (req, res, next) => {
   express.static(appSettings.downloadsDir)(req, res, next);
 });
