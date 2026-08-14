@@ -296,43 +296,43 @@
 
     <!-- Sezon & Bölüm Seçim Modalı -->
     <div id="series-modal" class="modal-overlay hidden">
-        <div class="modal-content glass max-w-2xl w-full bg-surface-container border-2 border-primary-container p-6 rounded-xl flex flex-col gap-6 shadow-2xl">
+        <div class="modal-content glass max-w-4xl w-full bg-surface-container border-2 border-primary-container p-6 rounded-xl flex flex-col gap-5 shadow-2xl">
             <div class="modal-header flex justify-between items-center border-b border-outline pb-3">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-primary-container">tv</span>
-                    <h2 id="modal-series-title" class="font-mono text-sm font-bold text-on-surface">dizi_adi.</h2>
+                    <h2 id="modal-series-title" class="font-mono text-base font-bold text-on-surface">dizi_adi.</h2>
                 </div>
                 <button id="btn-close-modal" class="px-4 py-1.5 bg-red-950/40 text-red-400 border border-red-500/30 rounded-full text-xs font-bold hover:bg-red-900/60 transition-colors">
                     kapat.
                 </button>
             </div>
             <div class="modal-body flex flex-col gap-4">
-                <div id="modal-seasons-bar" class="seasons-bar flex gap-2 overflow-x-auto pb-2">
+                <div id="modal-seasons-bar" class="seasons-bar flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                     <!-- Sezon Butonları -->
                 </div>
                 
                 <div id="bulk-download-panel" class="bulk-download-panel bg-surface-container-low border border-outline rounded-xl p-4 hidden flex-col gap-3">
-                    <div class="bulk-title font-mono text-xs text-primary-container flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[16px]">download_done</span> sezonu_toplu_indir.
+                    <div class="bulk-title font-mono text-xs text-primary-container flex items-center gap-1.5 font-bold">
+                        <span class="material-symbols-outlined text-[18px]">download_done</span> sezonu_toplu_indir.
                     </div>
                     <div class="bulk-controls flex flex-wrap gap-4 items-center">
                         <div class="control-group flex items-center gap-2">
-                            <label for="bulk-lang" class="font-mono text-[10px] text-on-surface-variant">yayın:</label>
-                            <select id="bulk-lang" class="bg-surface-container border border-outline rounded px-2 py-1 text-xs text-on-surface outline-none">
+                            <label for="bulk-lang" class="font-mono text-xs text-on-surface-variant">varsayılan_yayın:</label>
+                            <select id="bulk-lang" class="bg-surface-container border border-outline rounded-lg px-3 py-1.5 text-xs text-on-surface outline-none focus:border-primary-container">
                             </select>
                         </div>
                         <div class="control-group flex items-center gap-2">
-                            <label for="bulk-quality" class="font-mono text-[10px] text-on-surface-variant">kalite:</label>
-                            <select id="bulk-quality" class="bg-surface-container border border-outline rounded px-2 py-1 text-xs text-on-surface outline-none">
+                            <label for="bulk-quality" class="font-mono text-xs text-on-surface-variant">varsayılan_kalite:</label>
+                            <select id="bulk-quality" class="bg-surface-container border border-outline rounded-lg px-3 py-1.5 text-xs text-on-surface outline-none focus:border-primary-container">
                             </select>
                         </div>
-                        <button id="btn-bulk-download" class="ml-auto px-4 py-1.5 bg-primary-container text-black font-bold rounded-full text-xs hover:bg-primary-fixed transition-colors">
-                            sezonu_indir.
+                        <button id="btn-bulk-download" class="ml-auto px-5 py-2 bg-primary-container text-black font-bold rounded-full text-xs hover:bg-primary-fixed transition-colors flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px]">folder_zip</span> tüm_sezonu_indir.
                         </button>
                     </div>
                 </div>
 
-                <div id="modal-episodes-list" class="episodes-list max-h-80 overflow-y-auto flex flex-col gap-2 pr-1">
+                <div id="modal-episodes-list" class="episodes-list max-h-[440px] overflow-y-auto flex flex-col gap-2.5 pr-2 custom-scrollbar">
                     <!-- Bölümler -->
                 </div>
             </div>
