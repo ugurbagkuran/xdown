@@ -14,6 +14,7 @@ let elSeriesModal, elModalSeriesTitle, elBtnCloseModal, elModalSeasonsBar,
 const episodeDetailsCache = new Map();
 let activeSeasonEpisodes = [];
 let onProgressRefreshCallback = null;
+let currentSeriesTitle = "";
 
 function getElements() {
   elSeriesModal = document.getElementById("series-modal");
@@ -40,6 +41,7 @@ export function registerProgressRefreshCallback(callback) {
 
 export async function showSeriesDetails(seriesUrl, seriesTitle) {
   getElements();
+  currentSeriesTitle = seriesTitle || "";
   if (elModalSeriesTitle) elModalSeriesTitle.textContent = seriesTitle;
   if (elModalSeasonsBar) elModalSeasonsBar.innerHTML = '<div class="text-xs text-on-surface-variant font-mono py-2">yükleniyor...</div>';
   if (elModalEpisodesList) elModalEpisodesList.innerHTML = "";
@@ -79,14 +81,61 @@ export async function showSeriesDetails(seriesUrl, seriesTitle) {
   }
 }
 
+let currentSeasonStreams = [];
+
+function cleanEpisodeName(rawName, episodeNum) {
+  if (!rawName) return "";
+  let name = rawName.trim();
+  if (name.startsWith("(") && name.endsWith(")")) {
+    name = name.slice(1, -1).trim();
+  }
+  if (name.toLowerCase() === `${episodeNum}. bölüm` || name.toLowerCase() === `bölüm ${episodeNum}`) {
+    return "";
+  }
+  return name;
+}
+
+function updateEpisodeRowSelectors(row, streams, selectedLang = null, selectedQuality = null) {
+  const langSelect = row.querySelector(".ep-lang-select");
+  const qualitySelect = row.querySelector(".ep-quality-select");
+  if (!langSelect || !qualitySelect || !streams || streams.length === 0) return;
+
+  const currentLang = selectedLang || langSelect.value || streams[0].name;
+  langSelect.innerHTML = streams.map(s => 
+    `<option value="${s.name}" ${s.name === currentLang ? "selected" : ""}>${s.name}</option>`
+  ).join("");
+
+  const updateQualities = () => {
+    const chosenLang = langSelect.value;
+    const stream = streams.find(s => s.name === chosenLang) || streams[0];
+    if (stream && stream.qualities) {
+      const currentQ = selectedQuality || qualitySelect.value || (stream.qualities[0] ? stream.qualities[0].resolution : "");
+      qualitySelect.innerHTML = stream.qualities.map(q => 
+        `<option value="${q.resolution}" ${q.resolution === currentQ ? "selected" : ""}>${q.resolution}</option>`
+      ).join("");
+    }
+  };
+
+  langSelect.onchange = () => updateQualities();
+  updateQualities();
+}
+
+function updateAllEpisodeRowOptions(streams, defaultLang = null, defaultQuality = null) {
+  if (!elModalEpisodesList) return;
+  elModalEpisodesList.querySelectorAll(".episode-row").forEach(row => {
+    updateEpisodeRowSelectors(row, streams, defaultLang, defaultQuality);
+  });
+}
+
 async function loadSeasonAndEpisodes(episodes, seriesTitle) {
   activeSeasonEpisodes = episodes;
+  currentSeasonStreams = [];
   if (elModalEpisodesList) elModalEpisodesList.innerHTML = '<div class="text-xs text-on-surface-variant font-mono py-8 text-center w-full">bölümler yükleniyor...</div>';
   if (elBulkDownloadPanel) elBulkDownloadPanel.classList.add("hidden");
 
   renderEpisodes(episodes);
 
-  // Toplu indirme paneli için ilk bölümün yayın ve kalitelerini çekelim
+  // Toplu indirme paneli ve satır seçicileri için ilk bölümün yayın ve kalitelerini çekelim
   if (episodes.length > 0) {
     const firstEp = episodes[0];
     try {
@@ -99,7 +148,9 @@ async function loadSeasonAndEpisodes(episodes, seriesTitle) {
       }
 
       if (details && details.success && details.streams.length > 0) {
+        currentSeasonStreams = details.streams;
         populateBulkPanelOptions(details.streams);
+        updateAllEpisodeRowOptions(details.streams);
       }
     } catch (_) {}
   }
@@ -112,19 +163,26 @@ function renderEpisodes(episodes) {
     const hasTask = !!task;
     const progressPct = hasTask ? task.progress : 0;
     const isActive = hasTask && (task.status === "running" || task.status === "preparing" || task.status === "waiting");
+    const extraName = cleanEpisodeName(ep.name, ep.episode);
 
     return `
-      <div class="episode-row flex items-center justify-between p-3 bg-surface-container-low border border-outline/35 rounded-xl hover:border-primary-container/40 transition-all relative overflow-hidden" data-ep-url="${ep.url}">
+      <div class="episode-row" data-ep-url="${ep.url}">
         <div class="episode-progress-overlay absolute left-0 top-0 bottom-0 pointer-events-none transition-all duration-300" style="width: ${progressPct}%; background: rgba(255, 110, 64, 0.15)"></div>
-        <div class="episode-title flex flex-col z-10 min-w-0 pr-4 flex-grow">
-          <span class="block text-xs font-bold text-on-surface truncate">${ep.name}</span>
-          <span class="block text-[9px] text-on-surface-variant/60 font-mono mt-0.5 truncate">${ep.title}</span>
+        <div class="episode-title">
+          <div class="ep-num">${ep.season}. Sezon ${ep.episode}. Bölüm</div>
+          ${extraName ? `<div class="ep-name" title="${escapeHtml(extraName)}">${escapeHtml(extraName)}</div>` : `<div class="ep-name text-on-surface-variant/40 font-mono text-[10px]">Bölüm ${ep.episode}</div>`}
         </div>
-        <div class="episode-controls flex gap-2 z-10 shrink-0">
-          <button class="ep-dl-btn px-4 py-1.5 bg-primary-container text-black font-bold rounded-full text-[10px] hover:bg-primary-fixed transition-colors flex items-center ${isActive ? "hidden" : ""}">
-            <i class="fa-solid fa-download mr-1"></i> indir.
+        <div class="episode-controls">
+          <select class="ep-lang-select">
+            <option value="">yayın yükleniyor...</option>
+          </select>
+          <select class="ep-quality-select">
+            <option value="">kalite...</option>
+          </select>
+          <button class="ep-dl-btn px-4 py-1.5 bg-primary-container text-black font-bold rounded-full text-xs hover:bg-primary-fixed transition-colors flex items-center shrink-0 ${isActive ? "hidden" : ""}">
+            <i class="fa-solid fa-download mr-1.5"></i> indir.
           </button>
-          <button class="ep-cancel-btn px-4 py-1.5 bg-red-950/40 text-red-400 border border-red-500/30 rounded-full text-[10px] hover:bg-red-900/60 transition-colors ${!isActive ? "hidden" : ""}">
+          <button class="ep-cancel-btn px-4 py-1.5 bg-red-950/40 text-red-400 border border-red-500/30 rounded-full text-xs hover:bg-red-900/60 transition-colors shrink-0 ${!isActive ? "hidden" : ""}">
             iptal.
           </button>
         </div>
@@ -132,10 +190,16 @@ function renderEpisodes(episodes) {
     `;
   }).join("");
 
+  if (currentSeasonStreams && currentSeasonStreams.length > 0) {
+    updateAllEpisodeRowOptions(currentSeasonStreams);
+  }
+
   elModalEpisodesList.querySelectorAll(".episode-row").forEach((row, index) => {
     const ep = episodes[index];
     const dlBtn = row.querySelector(".ep-dl-btn");
     const cancelBtn = row.querySelector(".ep-cancel-btn");
+    const langSelect = row.querySelector(".ep-lang-select");
+    const qualitySelect = row.querySelector(".ep-quality-select");
     const task = getTaskByEpisodeUrl(ep.url);
 
     if (task) {
@@ -159,23 +223,24 @@ function renderEpisodes(episodes) {
           throw new Error("Yayın kaynağı bulunamadı.");
         }
 
-        let stream = details.streams[0];
-        const bulkLang = document.getElementById("bulk-lang");
-        if (bulkLang && bulkLang.value) {
-          const matchedStream = details.streams.find(s => s.name === bulkLang.value);
-          if (matchedStream) stream = matchedStream;
+        // Satırdaki seçici değerlerini kontrol et
+        const selectedLangVal = langSelect ? langSelect.value : "";
+        const selectedQualityVal = qualitySelect ? qualitySelect.value : "";
+
+        let stream = details.streams.find(s => s.name === selectedLangVal) || details.streams[0];
+        let quality = stream.qualities ? (stream.qualities.find(q => q.resolution === selectedQualityVal) || stream.qualities[0]) : null;
+        
+        if (!quality) {
+          throw new Error("Kalite akışı çözümlenemedi.");
         }
 
-        let quality = stream.qualities[0];
-        const bulkQuality = document.getElementById("bulk-quality");
-        if (bulkQuality && bulkQuality.value) {
-          const matchedQuality = stream.qualities.find(q => q.resolution === bulkQuality.value);
-          if (matchedQuality) quality = matchedQuality;
-        }
-        
+        const sNum = String(ep.season).padStart(2, "0");
+        const eNum = String(ep.episode).padStart(2, "0");
+        const epFileName = `${currentSeriesTitle || "Dizi"} - S${sNum}E${eNum}.mp4`;
+
         await autoDownloadFilm(
           quality.m3u8Url,
-          ep.title + ".ts",
+          epFileName,
           stream.subtitles || [],
           row,
           ep.url,
@@ -208,7 +273,7 @@ function populateBulkPanelOptions(streams) {
   
   const updateQualities = () => {
     const selectedLang = elBulkLang.value;
-    const stream = streams.find(s => s.name === selectedLang);
+    const stream = streams.find(s => s.name === selectedLang) || streams[0];
     if (stream && stream.qualities) {
       elBulkQuality.innerHTML = stream.qualities.map(q => 
         `<option value="${q.resolution}">${q.resolution}</option>`
@@ -216,9 +281,18 @@ function populateBulkPanelOptions(streams) {
     }
   };
 
-  elBulkLang.onchange = updateQualities;
-  updateQualities();
+  elBulkLang.onchange = () => {
+    updateQualities();
+    // Toplu panel dili değişince tüm satırları senkronize et
+    updateAllEpisodeRowOptions(streams, elBulkLang.value, elBulkQuality.value);
+  };
 
+  elBulkQuality.onchange = () => {
+    // Toplu panel kalitesi değişince tüm satırları senkronize et
+    updateAllEpisodeRowOptions(streams, elBulkLang.value, elBulkQuality.value);
+  };
+
+  updateQualities();
   elBulkDownloadPanel.classList.remove("hidden");
 }
 
@@ -273,9 +347,13 @@ export function initSeriesModalEvents() {
             const q = getEpisodeQuality(details.streams, lang, quality);
             
             if (q) {
+              const sNum = String(ep.season).padStart(2, "0");
+              const eNum = String(ep.episode).padStart(2, "0");
+              const epFileName = `${currentSeriesTitle || "Dizi"} - S${sNum}E${eNum}.mp4`;
+
               await autoDownloadFilm(
                 q.m3u8Url,
-                ep.title + ".ts",
+                epFileName,
                 stream.subtitles || [],
                 row,
                 ep.url,
