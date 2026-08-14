@@ -53,11 +53,16 @@ export function scheduleTaskCleanup(taskId, delayMs = 10 * 60 * 1000) {
 
 export function cleanupTaskFiles(tempDir, tsOutputPath, outputPath, options) {
   try {
-    if (fs.existsSync(tsOutputPath)) {
+    if (tempDir && fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  } catch (_) {}
+  try {
+    if (tsOutputPath && fs.existsSync(tsOutputPath)) {
       fs.unlinkSync(tsOutputPath);
     }
   } catch (_) {}
-  if (options.subtitles && Array.isArray(options.subtitles)) {
+  if (options && options.subtitles && Array.isArray(options.subtitles)) {
     const baseName = path.basename(outputPath, path.extname(outputPath));
     for (const sub of options.subtitles) {
       try {
@@ -81,7 +86,8 @@ export function stableTempDirForOutput(outputPath) {
     .update(String(outputPath))
     .digest("hex")
     .slice(0, 10);
-  return path.join(process.cwd(), "downloads", `.temp_${base}_${hash}`);
+  const parentDir = path.dirname(outputPath);
+  return path.join(parentDir, `.temp_${base}_${hash}`);
 }
 
 export async function runTask(taskId, urls, outputPath, options) {
