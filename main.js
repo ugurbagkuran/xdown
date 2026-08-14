@@ -65,7 +65,7 @@ async function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    title: "filmdownloader.",
+    title: "xdown.",
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

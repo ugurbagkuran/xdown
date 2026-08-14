@@ -87,7 +87,7 @@ spacing:
 
 ## Brand & Style
 
-This design system is built for a high-performance FilmDownloader utility, emphasizing efficiency, speed, and technical precision. The brand personality is **utilitarian, industrial, and high-tech**. It aims to evoke a sense of professional-grade tooling through a high-contrast aesthetic.
+This design system is built for a high-performance xdown utility, emphasizing efficiency, speed, and technical precision. The brand personality is **utilitarian, industrial, and high-tech**. It aims to evoke a sense of professional-grade tooling through a high-contrast aesthetic.
 
 The visual style blends **Brutalism** with **Modern Minimalism**. It utilizes heavy-weight typography, a strict monochromatic base with a singular high-energy accent, and structured, grid-based layouts. The interface should feel like an industrial dashboard—functional, raw, and unapologetically digital.
 

@@ -1,5 +1,5 @@
 {
-  "name": "filmdownloader",
+  "name": "xdown",
   "version": "1.0.2",
   "description": "Şifreli PNG Video Parçalarını Yakalama ve Çözme Yazılımı",
   "type": "module",
@@ -20,8 +20,8 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.antigravity.filmdownloader",
-    "productName": "filmdownloader",
+    "appId": "com.antigravity.xdown",
+    "productName": "xdown",
     "publish": [
       {
         "provider": "github",

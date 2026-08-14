@@ -1,7 +1,7 @@
-# FilmDownloader Projesi AI Talimatları
+# xdown Projesi AI Talimatları
 
 ## Proje Hakkında
-- **Adı:** filmdownloader
+- **Adı:** xdown
 - **Amaç:** Şifreli PNG formatındaki video parçalarını (veya segmentleri) yakalayıp, şifrelerini çözerek birleştirilmiş, izlenebilir video dosyası haline getiren Node.js tabanlı bir yazılımdır.
 - **Kapsam:** Belirli platformlar (örneğin fullhdfilmizle) üzerinden arama yapma, otomatik extract (çıkarma) işlemleri ve şifreli veri işleme özellikleri içerir.
 
