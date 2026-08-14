@@ -85,13 +85,13 @@ export function updateEpisodeDownloadState(task, pct = task.progress || 0) {
     }
   }
 
-  const epTitleSpan = task.itemElement.querySelector(".episode-title span:first-child");
+  const epTitleSpan = task.itemElement.querySelector(".episode-title .ep-num") || task.itemElement.querySelector(".episode-title span:first-child");
   if (epTitleSpan) {
     if (!epTitleSpan.dataset.baseText) {
       epTitleSpan.dataset.baseText = epTitleSpan.textContent;
     }
     if (task.status === "running" || task.status === "waiting") {
-      const suffix = task.status === "waiting" ? " (sırada)" : ` (${pct}%)`;
+      const suffix = task.status === "waiting" ? " (sırada)" : ` (%${pct})`;
       epTitleSpan.textContent = `${epTitleSpan.dataset.baseText}${suffix}`;
     } else {
       epTitleSpan.textContent = epTitleSpan.dataset.baseText;
@@ -100,16 +100,23 @@ export function updateEpisodeDownloadState(task, pct = task.progress || 0) {
 
   const dlBtn = task.itemElement.querySelector(".ep-dl-btn");
   const cancelBtn = task.itemElement.querySelector(".ep-cancel-btn");
+  const langSelect = task.itemElement.querySelector(".ep-lang-select");
+  const qualitySelect = task.itemElement.querySelector(".ep-quality-select");
+
+  const isActive =
+    task.status === "running" ||
+    task.status === "preparing" ||
+    task.status === "waiting";
+
+  if (langSelect) langSelect.disabled = isActive;
+  if (qualitySelect) qualitySelect.disabled = isActive;
+
   if (dlBtn && cancelBtn) {
-    const isActive =
-      task.status === "running" ||
-      task.status === "preparing" ||
-      task.status === "waiting";
     dlBtn.classList.toggle("hidden", isActive);
     cancelBtn.classList.toggle("hidden", !isActive);
     if (!isActive) {
       dlBtn.disabled = false;
-      dlBtn.innerHTML = `${SVG_DOWNLOAD_ICON} indir.`;
+      dlBtn.innerHTML = `<i class="fa-solid fa-download mr-1.5"></i> indir.`;
     }
   }
 }
@@ -236,7 +243,7 @@ export async function autoDownloadFilm(
     const finishTask = () => {
       if (task.interval) clearInterval(task.interval);
       downloadTasksByUrl.delete(filmUrl);
-      if (task.episodeUrl) {
+      if (task.episodeUrl && task.status !== "completed") {
         episodeDownloadTasksByEpisodeUrl.delete(task.episodeUrl);
       }
     };
@@ -312,10 +319,11 @@ export async function autoDownloadFilm(
       }
 
       safeTitle = safeTitle
-        .replace(/[^a-z0-9ığüşöçİĞÜŞÖÇ\-_]/gi, "")
+        .replace(/[^a-z0-9ığüşöçİĞÜŞÖÇ\s\-_.]/gi, "")
         .trim()
         .replace(/\s+/g, "_");
       const outputName = `${safeTitle}${extension}`;
+      task.outputName = outputName;
 
       const candidateHosts = (streamData.candidateUrls || [])
         .map((u) => {
@@ -383,18 +391,19 @@ export async function autoDownloadFilm(
             
             // Sistem bildirimi gönder
             try {
+              const videoDisplayTitle = data.outputName || task.filmTitle || 'Video';
               apiGetSettings().then(settingsData => {
                 if (settingsData.success && settingsData.settings && settingsData.settings.showNotifications) {
                   if (Notification.permission === "granted") {
                     new Notification("İndirme Tamamlandı", {
-                      body: `${task.fileName || 'Video'} başarıyla indirildi.`,
+                      body: `${videoDisplayTitle} başarıyla indirildi.`,
                       icon: "/download.svg"
                     });
                   } else if (Notification.permission !== "denied") {
                     Notification.requestPermission().then(permission => {
                       if (permission === "granted") {
                         new Notification("İndirme Tamamlandı", {
-                          body: `${task.fileName || 'Video'} başarıyla indirildi.`,
+                          body: `${videoDisplayTitle} başarıyla indirildi.`,
                           icon: "/download.svg"
                         });
                       }
