@@ -463,7 +463,7 @@ app.get("/api/analyze", async (req, res) => {
           const subContentStr = subBuffer.toString("utf-8").trim();
           return parseMediaPlaylist(
             subContentStr,
-            bestPlaylistUrl,
+            finalPlaylistUrl,
             res,
             extraHeaders,
           );
@@ -863,18 +863,14 @@ app.get("/api/prepare-video", async (req, res) => {
 
 // Stream TS files on-the-fly converting to MP4 format dynamically using FFmpeg
 app.get("/api/stream-ts", async (req, res) => {
-  const { file } = req.query;
-  if (!file) {
-    return res.status(400).send("Dosya belirtilmedi.");
+  const resolved = resolveDownloadFilePath(req.query.file);
+  if (!resolved) {
+    return res.status(400).send("Dosya belirtilmedi veya geçersiz yol.");
   }
 
-  const downloadsDir = appSettings.downloadsDir;
-  const filePath = path.join(downloadsDir, file);
-
-  const relative = path.relative(downloadsDir, filePath);
-  const isSafe = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
-  if (!isSafe || !fs.existsSync(filePath)) {
-    return res.status(404).send("Dosya bulunamadı veya geçersiz yol.");
+  const { filePath } = resolved;
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("Dosya bulunamadı.");
   }
 
   res.writeHead(200, {

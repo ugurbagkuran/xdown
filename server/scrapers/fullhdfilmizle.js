@@ -38,9 +38,13 @@ export async function fetchPlayerIframeUrl(
     req.end();
   });
   
-  const ajaxJson = JSON.parse(ajaxBuf.toString("utf-8"));
-  if (!ajaxJson.success || !ajaxJson.data || !ajaxJson.data.url) return null;
-  return ajaxJson.data.url;
+  try {
+    const ajaxJson = JSON.parse(ajaxBuf.toString("utf-8"));
+    if (!ajaxJson || !ajaxJson.success || !ajaxJson.data || !ajaxJson.data.url) return null;
+    return ajaxJson.data.url;
+  } catch (_) {
+    return null;
+  }
 }
 
 // Helper: extract manifest URL from player page HTML

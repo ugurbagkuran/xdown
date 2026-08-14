@@ -38,7 +38,7 @@ export async function searchSeries(q) {
   const searchUrl = `https://www.diziyou.one/?s=${encodeURIComponent(q)}`;
   const buf = await fetchBuffer(searchUrl, {
     Referer: "https://www.diziyou.one/",
-  }, 0, 4000);
+  }, 0, 12000);
   const html = buf.toString("utf-8");
   const films = [];
   const blocks = html.split('class="cat-img"').slice(1);
@@ -139,7 +139,9 @@ export async function extractSeriesVideo(url, logger) {
   const logFile = path.join(process.cwd(), "server_debug.log");
   const log = (msg) => {
     const time = new Date().toISOString();
-    fs.appendFileSync(logFile, `[${time}] ${msg}\n`);
+    try {
+      fs.appendFileSync(logFile, `[${time}] ${msg}\n`);
+    } catch (_) {}
     if (logger) logger(msg);
     else console.log(msg);
   };
