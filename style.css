@@ -593,6 +593,84 @@
     transform: scale(1.08);
 }
 
+.btn-episode-action {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: #222222;
+    border: 1px solid #333333;
+    color: #a0a0a0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-episode-action:hover {
+    background: #333333;
+    color: #ffffff;
+    border-color: #555555;
+}
+
+.btn-episode-action.btn-ep-delete:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.5);
+}
+
+.btn-episode-action.watched-active {
+    color: #10b981;
+}
+
+/* Card Quick Action Icons */
+.card-quick-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    z-index: 30;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    transform: translateY(-2px);
+}
+
+.library-card:hover .card-quick-actions,
+.card-quick-actions:focus-within {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.card-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(15, 17, 21, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e3e2e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    backdrop-filter: blur(4px);
+}
+
+.card-action-btn:hover {
+    background: #f8a380;
+    color: #0c0c0c;
+    border-color: #f8a380;
+    transform: scale(1.08);
+}
+
+.card-action-btn.btn-delete:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+}
+
 .btn-episode-export {
     display: inline-flex;
     align-items: center;

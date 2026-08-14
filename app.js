@@ -21,7 +21,14 @@ import {
   registerPlayerCloseCallback
 } from "./js/ui/videoPlayer.js";
 import { openEpisodePicker } from "./js/ui/episodePicker.js";
-import { apiSearch, apiGetDownloadsList } from "./js/services/api.js";
+import { 
+  apiSearch, 
+  apiGetDownloadsList, 
+  apiDeleteFile, 
+  apiDeleteSeries, 
+  apiOpenFolder, 
+  apiGetStorageInfo 
+} from "./js/services/api.js";
 
 // DOM Elements
 const elSearchInput = document.getElementById("search-input");
@@ -30,11 +37,59 @@ const elFilmGrid = document.getElementById("film-grid");
 const elLibraryGrid = document.getElementById("library-grid");
 const elLibrarySearchInput = document.getElementById("library-search-input");
 const elLibraryTotalCount = document.getElementById("library-total-count");
+const elLibSizeVal = document.getElementById("lib-size-val");
+const elLibFreeVal = document.getElementById("lib-free-val");
+const elBtnOpenDownloadsDir = document.getElementById("btn-open-downloads-dir");
 
 // App States
 let activeSearchType = "movie";
 let libraryFiles = [];
 const librarySeriesIndex = new Map(); // seriesKey -> [episodes]
+
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("custom-confirm-modal");
+    const text = document.getElementById("custom-confirm-text");
+    const btnYes = document.getElementById("btn-confirm-yes");
+    const btnNo = document.getElementById("btn-confirm-no");
+    if (!modal || !text || !btnYes || !btnNo) {
+      resolve(window.confirm(message));
+      return;
+    }
+
+    text.textContent = message;
+    modal.classList.remove("hidden");
+
+    const cleanup = () => {
+      modal.classList.add("hidden");
+      btnYes.removeEventListener("click", onYes);
+      btnNo.removeEventListener("click", onNo);
+    };
+
+    const onYes = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onNo = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    btnYes.addEventListener("click", onYes);
+    btnNo.addEventListener("click", onNo);
+  });
+}
+
+async function updateStorageDisplay() {
+  try {
+    const data = await apiGetStorageInfo();
+    if (data && data.success) {
+      if (elLibSizeVal) elLibSizeVal.textContent = data.libraryFormatted || "0 B";
+      if (elLibFreeVal) elLibFreeVal.textContent = data.freeFormatted || "0 GB";
+    }
+  } catch (_) {}
+}
 
 // Search Type Selector Logic
 document.querySelectorAll(".type-btn").forEach((btn) => {
@@ -151,6 +206,7 @@ async function fetchDownloadsList() {
       registerLibraryData(libraryFiles, librarySeriesIndex);
       renderLibraryGrid(libraryFiles);
     }
+    updateStorageDisplay();
   } catch (err) {
     console.error("Kütüphane listesi çekilemedi:", err);
   }
@@ -242,7 +298,7 @@ function renderLibraryGrid(files) {
       renderedKeys.add(meta.key);
 
       // İlerleme durumunu kontrol edelim
-      const episodes = librarySeriesIndex.get(meta.key);
+      const episodes = librarySeriesIndex.get(meta.key) || [];
       const sorted = episodes.slice().sort((a, b) => a.season - b.season || a.episode - b.episode);
       
       // En son oynatılan/açılan bölümü bulmaya çalışalım (Netflix tarzı bellek)
@@ -292,13 +348,20 @@ function renderLibraryGrid(files) {
 
       gridItemsHtml.push({
         html: `
-          <div class="library-card group flex flex-col gap-3 cursor-pointer" data-file="${encodeURIComponent(targetEp.name)}" data-is-series="true" data-series-key="${meta.key}">
+          <div class="library-card group flex flex-col gap-3 cursor-pointer relative" data-file="${encodeURIComponent(targetEp.name)}" data-is-series="true" data-series-key="${meta.key}">
             <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container border border-outline/50 group-hover:border-primary-container/50 transition-colors">
               <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="/api/video-thumbnail?file=${encodeURIComponent(targetEp.name)}" alt="" onerror="this.src='https://via.placeholder.com/320x480/111/555?text=${encodeURIComponent(meta.seriesName)}'">
-              <div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
-                <button class="btn-show-episodes absolute top-3 right-3 z-30 p-2 bg-surface-container border border-outline hover:border-primary-container text-on-surface hover:text-primary-container rounded-lg transition-all flex items-center justify-center" title="Bölümleri Listele">
-                  <span class="material-symbols-outlined text-[18px]">playlist_play</span>
+              
+              <div class="card-quick-actions">
+                <button class="card-action-btn btn-show-episodes" title="Bölümleri Listele">
+                  <span class="material-symbols-outlined text-[16px]">playlist_play</span>
                 </button>
+                <button class="card-action-btn btn-delete btn-delete-series" title="Tüm Diziyi Diskten Sil">
+                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+              </div>
+
+              <div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center gap-2 backdrop-blur-sm">
                 <div class="btn-play-series flex flex-col items-center gap-2 cursor-pointer z-20 hover:scale-105 transition-transform">
                   <span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
                   <span class="font-mono text-[9px] text-on-surface-variant">${targetEp.season}. Sezon ${targetEp.episode}. Bölüm</span>
@@ -322,12 +385,26 @@ function renderLibraryGrid(files) {
       const pos = Number.parseFloat(localStorage.getItem(`playback_pos_${file.name}`) || "0");
       const dur = Number.parseFloat(localStorage.getItem(`playback_dur_${file.name}`) || "0");
       const progressPct = dur > 0 ? (pos / dur) * 100 : 0;
+      const isWatched = progressPct >= 90 || (dur > 0 && dur - pos < 30);
 
       gridItemsHtml.push({
         html: `
-          <div class="library-card group flex flex-col gap-3 cursor-pointer" data-file="${encodeURIComponent(file.name)}">
+          <div class="library-card group flex flex-col gap-3 cursor-pointer relative" data-file="${encodeURIComponent(file.name)}">
             <div class="relative aspect-[2/3] rounded-xl overflow-hidden bg-surface-container border border-outline/50 group-hover:border-primary-container/50 transition-colors">
               <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="/api/video-thumbnail?file=${encodeURIComponent(file.name)}" alt="" onerror="this.src='https://via.placeholder.com/320x480/111/555?text=${encodeURIComponent(file.name)}'">
+              
+              <div class="card-quick-actions">
+                <button class="card-action-btn btn-card-folder" title="Klasörde Göster">
+                  <span class="material-symbols-outlined text-[16px]">folder_open</span>
+                </button>
+                <button class="card-action-btn btn-card-watch-toggle ${isWatched ? "text-emerald-400" : ""}" title="${isWatched ? "İzlenmedi Olarak İşaretle" : "İzlendi Olarak İşaretle"}">
+                  <span class="material-symbols-outlined text-[16px]">${isWatched ? "check_circle" : "check"}</span>
+                </button>
+                <button class="card-action-btn btn-delete btn-card-delete" title="Filmi Diskten Sil">
+                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+              </div>
+
               <div class="absolute inset-0 bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-sm">
                 <span class="material-symbols-outlined text-[48px] text-primary-container drop-shadow-lg" style="font-variation-settings: 'FILL' 1;">play_circle</span>
               </div>
@@ -362,20 +439,101 @@ function renderLibraryGrid(files) {
   if (elLibraryTotalCount) elLibraryTotalCount.textContent = String(filtered.length);
 
   elLibraryGrid.querySelectorAll(".library-card").forEach(card => {
+    const fileName = decodeURIComponent(card.dataset.file);
+    const seriesKey = card.dataset.seriesKey;
+    const isSeries = card.dataset.isSeries === "true";
+
+    // 1. Bölümleri listele butonu (Dizi)
     const btnEpisodes = card.querySelector(".btn-show-episodes");
     if (btnEpisodes) {
       btnEpisodes.addEventListener("click", (e) => {
-        e.stopPropagation(); // Kartın genel tıklama olayını engelle (doğrudan oynatma eylemi)
-        const seriesKey = card.dataset.seriesKey;
+        e.stopPropagation();
         const episodes = librarySeriesIndex.get(seriesKey) || [];
         const seriesName = card.querySelector("h3").textContent;
         openEpisodePicker(seriesKey, seriesName, episodes, openVideoPlayer);
       });
     }
 
+    // 2. Tüm diziyi sil butonu (Dizi)
+    const btnDeleteSeries = card.querySelector(".btn-delete-series");
+    if (btnDeleteSeries) {
+      btnDeleteSeries.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const episodes = librarySeriesIndex.get(seriesKey) || [];
+        const seriesName = card.querySelector("h3").textContent;
+        const confirmed = await showConfirm(`"${seriesName}" dizisine ait ${episodes.length} bölümün tamamını diskten kalıcı olarak silmek istiyor musunuz?`);
+        if (!confirmed) return;
+
+        btnDeleteSeries.disabled = true;
+        try {
+          const res = await apiDeleteSeries(episodes.map(ep => ep.name));
+          if (res.success) {
+            fetchDownloadsList();
+          } else {
+            alert("Silme başarısız: " + (res.error || "Bilinmeyen hata"));
+            btnDeleteSeries.disabled = false;
+          }
+        } catch (err) {
+          alert("Hata oluştu: " + err.message);
+          btnDeleteSeries.disabled = false;
+        }
+      });
+    }
+
+    // 3. Klasörde göster butonu (Film)
+    const btnCardFolder = card.querySelector(".btn-card-folder");
+    if (btnCardFolder) {
+      btnCardFolder.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await apiOpenFolder(fileName);
+      });
+    }
+
+    // 4. İzlendi / Sıfırla butonu (Film)
+    const btnWatchToggle = card.querySelector(".btn-card-watch-toggle");
+    if (btnWatchToggle) {
+      btnWatchToggle.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const dur = Number.parseFloat(localStorage.getItem(`playback_dur_${fileName}`) || "100");
+        const pos = Number.parseFloat(localStorage.getItem(`playback_pos_${fileName}`) || "0");
+        const isWatched = pos >= dur * 0.9 || (dur > 0 && dur - pos < 30);
+
+        if (isWatched) {
+          localStorage.setItem(`playback_pos_${fileName}`, "0");
+        } else {
+          localStorage.setItem(`playback_pos_${fileName}`, String(dur));
+        }
+        renderLibrary();
+      });
+    }
+
+    // 5. Filmi sil butonu (Film)
+    const btnCardDelete = card.querySelector(".btn-card-delete");
+    if (btnCardDelete) {
+      btnCardDelete.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const confirmed = await showConfirm(`"${fileName}" filmini diskten kalıcı olarak silmek istiyor musunuz?`);
+        if (!confirmed) return;
+
+        btnCardDelete.disabled = true;
+        try {
+          const res = await apiDeleteFile(fileName);
+          if (res.success) {
+            fetchDownloadsList();
+          } else {
+            alert("Silme başarısız: " + (res.error || "Bilinmeyen hata"));
+            btnCardDelete.disabled = false;
+          }
+        } catch (err) {
+          alert("Hata oluştu: " + err.message);
+          btnCardDelete.disabled = false;
+        }
+      });
+    }
+
+    // 6. Kart tıklama (Oynat)
     card.addEventListener("click", () => {
-      const file = decodeURIComponent(card.dataset.file);
-      openVideoPlayer(file);
+      openVideoPlayer(fileName);
     });
   });
 }
@@ -401,6 +559,13 @@ window.addEventListener("DOMContentLoaded", () => {
   registerDownloadsCallback(fetchDownloadsList);
   registerProgressRefreshCallback(renderLibrary);
   registerPlayerCloseCallback(fetchDownloadsList);
+
+  // Klasör Aç Butonu (Header)
+  if (elBtnOpenDownloadsDir) {
+    elBtnOpenDownloadsDir.addEventListener("click", async () => {
+      await apiOpenFolder();
+    });
+  }
 
   // Initial downloads fetch
   fetchDownloadsList();

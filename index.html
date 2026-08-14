@@ -204,16 +204,27 @@
             <!-- ══════════ SEKMELİ 2: KÜTÜPHANE ══════════ -->
             <div id="tab-library" class="tab-panel flex flex-col gap-6">
                 <!-- Library Filter Header -->
-                <div class="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-surface-container/60 border border-outline/30 rounded-xl p-3.5">
                     <!-- Technical Search -->
-                    <div class="relative w-full sm:w-80 group">
-                        <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary-container transition-colors">search</span>
-                        <input id="library-search-input" class="w-full bg-surface-container border border-outline rounded-lg py-2.5 pl-12 pr-4 text-xs text-on-surface font-mono focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all placeholder:text-on-surface-variant/40" placeholder="kütüphanede_ara." type="text"/>
+                    <div class="relative w-full md:w-80 group">
+                        <span class="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary-container transition-colors text-[18px]">search</span>
+                        <input id="library-search-input" class="w-full bg-surface-container-low border border-outline rounded-lg py-2 pl-10 pr-4 text-xs text-on-surface font-mono focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all placeholder:text-on-surface-variant/40" placeholder="kütüphanede_ara." type="text"/>
                     </div>
                     
-                    <!-- Quick Stats -->
-                    <div class="flex gap-4 font-mono text-[10px] text-on-surface-variant">
-                        <span>toplam: <strong id="library-total-count" class="text-primary-container">0</strong></span>
+                    <!-- Quick Stats & Storage Info -->
+                    <div class="flex flex-wrap items-center gap-3 font-mono text-[11px] text-on-surface-variant w-full md:w-auto justify-between md:justify-end">
+                        <div id="library-storage-badge" class="flex items-center gap-2 bg-surface-container-low border border-outline/40 px-3 py-1.5 rounded-lg">
+                            <span class="text-on-surface-variant/70">indirilen: <strong id="lib-size-val" class="text-primary-container">0 B</strong></span>
+                            <span class="text-outline">|</span>
+                            <span class="text-on-surface-variant/70">boş alan: <strong id="lib-free-val" class="text-on-surface">0 GB</strong></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-surface-container-low border border-outline/40 px-2.5 py-1.5 rounded-lg">öğe: <strong id="library-total-count" class="text-primary-container">0</strong></span>
+                            <button id="btn-open-downloads-dir" title="İndirilenler klasörünü Windows Gezgini'nde aç" class="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container hover:bg-surface-variant border border-outline rounded-lg text-xs font-mono text-on-surface transition-colors cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px] text-primary-container">folder_open</span>
+                                <span class="hidden sm:inline">klasörü_aç.</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
